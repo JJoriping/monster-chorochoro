@@ -1,11 +1,12 @@
 "use client";
 
 import { lexicon } from "@daldalso/i18n";
-import { CircleAlert, LoaderCircle, LogOut, RefreshCw, Unplug } from "lucide-react";
+import { CircleAlert, LoaderCircle, RefreshCw, Unplug } from "lucide-react";
 import { type ReactNode, useEffect } from "react";
 import lPlay from "@/i18n/l.play";
+import GameView from "./game-view";
 import LobbyView from "./lobby-view";
-import { connect, disconnect, dismissError, send, usePlayStore } from "./play-store";
+import { connect, disconnect, dismissError, usePlayStore } from "./play-store";
 import RoomView from "./room-view";
 import { Button } from "./ui";
 
@@ -60,16 +61,7 @@ const Screen = () => {
   }
   if (!room) return <LobbyView />;
   if (room.status === "waiting") return <RoomView room={room} />;
-  // 게임 화면은 아직 만들지 않았다
-  return (
-    <Notice>
-      <p c="text-h1 font-black text-gray-2">{l("gameTbd")}</p>
-      <Button variant="secondary" onClick={() => send({ type: "leaveRoom" })}>
-        <LogOut size={14} />
-        {l("leaveRoom")}
-      </Button>
-    </Notice>
-  );
+  return <GameView room={room} />;
 };
 
 const Notice = ({ children }: { children: ReactNode }) => {

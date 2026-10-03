@@ -4,7 +4,11 @@ import {
   type ClientMessage,
   DEFAULT_CHARACTER_ID,
   DEFAULT_MAP_ID,
+  type Direction,
   type ErrorCode,
+  GAME_DURATION_MS,
+  GAME_RESULT_MS,
+  type GameInfo,
   MAX_PLAYERS_PER_ROOM,
   type MapId,
   NICKNAME_MAX_LENGTH,
@@ -14,10 +18,20 @@ import {
   type RoomStatus,
   type RoomSummary,
   type ServerMessage,
+  TICK_MS,
   type UserId,
   type UserSummary,
 } from "@monster-chorochoro/common";
 import { WebSocket } from "ws";
+import {
+  createGame,
+  type Game,
+  placeKuru,
+  removePlayer,
+  setPlayerInput,
+  stepGame,
+  toSnapshot,
+} from "./game";
 
 export type User = {
   id: UserId;
@@ -40,6 +54,9 @@ type Room = {
   status: RoomStatus;
   /** 입장한 순서대로 정렬된다 */
   players: Player[];
+  game: Game | null;
+  /** 게임 중에는 틱 루프, 결과를 보여 주는 동안에는 방으로 돌아가는 타이머 */
+  gameTimer: NodeJS.Timeout | null;
 };
 
 const users = new Map<UserId, User>();
@@ -87,6 +104,10 @@ function dispatch(user: User, message: ClientMessage): ErrorCode | undefined {
       return startGame(user);
     case "chat":
       return chat(user, message.text);
+    case "move":
+      return move(user, message.direction);
+    case "placeKuru":
+      return fire(user);
   }
 }
 
@@ -114,6 +135,8 @@ function createRoom(user: User, value: string): ErrorCode | undefined {
     mapId: DEFAULT_MAP_ID,
     status: "waiting",
     players: [],
+    game: null,
+    gameTimer: null,
   };
   rooms.set(room.id, room);
   enterRoom(user, room);
@@ -143,9 +166,11 @@ function leaveRoom(user: User): ErrorCode | undefined {
   room.players = room.players.filter((v) => v.userId !== user.id);
   user.roomId = null;
   send(user, { type: "room", room: null });
+  if (room.game) removePlayer(room.game, user.id);
 
   const [nextHost] = room.players;
   if (!nextHost) {
+    stopGameTimer(room);
     rooms.delete(room.id);
   } else {
     // 방장이 나가면 가장 먼저 들어온 플레이어가 방장을 물려받는다
@@ -200,9 +225,56 @@ function startGame(user: User): ErrorCode | undefined {
   if (room.hostId !== user.id) return "notHost";
   if (room.players.some((v) => v.userId !== room.hostId && !v.ready)) return "notAllReady";
 
+  const game = createGame(room.mapId, room.players);
   room.status = "playing";
+  room.game = game;
+  sendToRoom(room, { type: "gameStart", game: toGameInfo(room, game) });
   broadcastRoom(room);
   broadcastLobby();
+  // 타이머는 운영체제에 따라 늦게 불리기도 하므로(Windows에서는 약 15.6ms 단위) 틱 간격보다 자주 깨어나서
+  // 실제로 흐른 시간만큼 틱을 따라잡는다
+  const startedAt = performance.now();
+  room.gameTimer = setInterval(() => tickGame(room, startedAt), TICK_MS / 2);
+}
+
+function tickGame(room: Room, startedAt: number): void {
+  const { game } = room;
+  if (!game) return;
+  const dueTick = Math.floor((performance.now() - startedAt) / TICK_MS);
+  if (game.tick >= dueTick) return;
+  while (game.tick < dueTick && !game.result) stepGame(game);
+  sendToRoom(room, { type: "gameState", state: toSnapshot(game) });
+  if (!game.result) return;
+
+  stopGameTimer(room);
+  sendToRoom(room, { type: "gameEnd", result: game.result });
+  room.gameTimer = setTimeout(() => finishGame(room), GAME_RESULT_MS);
+}
+
+/** 결과를 다 보여 주면 방을 대기 상태로 되돌린다. 방장이 아닌 플레이어는 다시 준비해야 한다 */
+function finishGame(room: Room): void {
+  room.gameTimer = null;
+  room.game = null;
+  room.status = "waiting";
+  for (const v of room.players) v.ready = false;
+  broadcastRoom(room);
+  broadcastLobby();
+}
+
+function stopGameTimer(room: Room): void {
+  if (room.gameTimer) clearTimeout(room.gameTimer);
+  room.gameTimer = null;
+}
+
+function move(user: User, direction: Direction | null): undefined {
+  const game = getRoomOf(user)?.game;
+  // 게임 밖에서 온 조작은 조용히 무시한다
+  if (game) setPlayerInput(game, user.id, direction);
+}
+
+function fire(user: User): undefined {
+  const game = getRoomOf(user)?.game;
+  if (game) placeKuru(game, user.id);
 }
 
 function chat(user: User, value: string): ErrorCode | undefined {
@@ -211,7 +283,7 @@ function chat(user: User, value: string): ErrorCode | undefined {
   const text = value.trim().slice(0, CHAT_MAX_LENGTH);
   if (!text) return;
 
-  const data = JSON.stringify({
+  sendToRoom(room, {
     type: "chat",
     message: {
       id: nextChatId++,
@@ -220,11 +292,7 @@ function chat(user: User, value: string): ErrorCode | undefined {
       text,
       sentAt: Date.now(),
     },
-  } satisfies ServerMessage);
-  for (const v of room.players) {
-    const target = users.get(v.userId);
-    if (target) sendRaw(target, data);
-  }
+  });
 }
 
 function getRoomOf(user: User): Room | undefined {
@@ -263,6 +331,19 @@ function toRoomSummary(room: Room): RoomSummary {
   };
 }
 
+function toGameInfo(room: Room, game: Game): GameInfo {
+  return {
+    mapId: room.mapId,
+    tiles: game.tiles.join(""),
+    players: game.players.map((v) => ({
+      userId: v.userId,
+      nickname: users.get(v.userId)?.nickname ?? "",
+      characterId: v.characterId,
+    })),
+    durationMs: GAME_DURATION_MS,
+  };
+}
+
 function toRoomDetail(room: Room): RoomDetail {
   return {
     id: room.id,
@@ -289,7 +370,11 @@ function broadcastLobby(): void {
 }
 
 function broadcastRoom(room: Room): void {
-  const data = JSON.stringify({ type: "room", room: toRoomDetail(room) } satisfies ServerMessage);
+  sendToRoom(room, { type: "room", room: toRoomDetail(room) });
+}
+
+function sendToRoom(room: Room, message: ServerMessage): void {
+  const data = JSON.stringify(message);
   for (const v of room.players) {
     const target = users.get(v.userId);
     if (target) sendRaw(target, data);

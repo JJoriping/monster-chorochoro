@@ -5,6 +5,9 @@ import {
   type ClientMessage,
   type ErrorCode,
   GAME_SERVER_PORT,
+  type GameInfo,
+  type GameResult,
+  type GameSnapshot,
   type RoomDetail,
   type RoomSummary,
   type ServerMessage,
@@ -12,6 +15,7 @@ import {
   type UserSummary,
 } from "@monster-chorochoro/common";
 import { create } from "zustand";
+import { pushGameSnapshot, resetGameBuffer } from "./game-buffer";
 
 /** 방 안에서 보관하는 채팅의 최대 개수 */
 const CHAT_HISTORY_LIMIT = 100;
@@ -23,6 +27,11 @@ type PlayState = {
   rooms: RoomSummary[];
   room: RoomDetail | null;
   chats: ChatMessage[];
+  /** 방이 게임 중일 때만 있다 */
+  game: GameInfo | null;
+  /** 가장 최근에 받은 게임 상태. 화면에 그리는 상태는 `game-buffer`에서 따로 고른다 */
+  gameState: GameSnapshot | null;
+  gameResult: GameResult | null;
   /** 같은 오류가 연달아 와도 다시 보이도록 매번 다른 seq를 붙인다 */
   error: { code: ErrorCode; seq: number } | null;
 };
@@ -34,6 +43,9 @@ const INITIAL_STATE: PlayState = {
   rooms: [],
   room: null,
   chats: [],
+  game: null,
+  gameState: null,
+  gameResult: null,
   error: null,
 };
 
@@ -55,6 +67,9 @@ export function connect(): void {
   socket.addEventListener("message", (event) => {
     if (!isCurrent() || typeof event.data !== "string") return;
     const message = JSON.parse(event.data) as ServerMessage;
+    // 캔버스가 매 프레임 읽는 스냅숏은 렌더링과 상관없이 따로 쌓는다
+    if (message.type === "gameStart") resetGameBuffer(message.game.tiles);
+    else if (message.type === "gameState") pushGameSnapshot(message.state);
     usePlayStore.setState((state) => receive(state, message));
   });
   socket.addEventListener("close", () => {
@@ -83,13 +98,25 @@ function receive(state: PlayState, message: ServerMessage): Partial<PlayState> {
     case "lobby":
       return { users: message.users, rooms: message.rooms };
     case "room":
-      // 다른 방으로 옮기거나 방을 나가면 채팅 기록을 비운다
       return {
         room: message.room,
+        // 다른 방으로 옮기거나 방을 나가면 채팅 기록을 비운다
         chats: message.room?.id === state.room?.id ? state.chats : [],
+        // 게임이 끝나 방이 대기 상태로 돌아오면 게임 화면을 닫는다
+        ...(message.room?.status !== "playing" && {
+          game: null,
+          gameState: null,
+          gameResult: null,
+        }),
       };
     case "chat":
       return { chats: [...state.chats, message.message].slice(-CHAT_HISTORY_LIMIT) };
+    case "gameStart":
+      return { game: message.game, gameState: null, gameResult: null };
+    case "gameState":
+      return { gameState: message.state };
+    case "gameEnd":
+      return { gameResult: message.result };
     case "error":
       return { error: { code: message.code, seq: (state.error?.seq ?? 0) + 1 } };
   }

@@ -21,28 +21,19 @@ import {
   Shirt,
   Users,
 } from "lucide-react";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import lPlay from "@/i18n/l.play";
 import { send, usePlayStore } from "./play-store";
 import { Button, CharacterAvatar, MapBadge, MapTile, Panel, TextInput } from "./ui";
 
 const RoomView = ({ room }: { room: RoomDetail }) => {
   const myId = usePlayStore((s) => s.myId);
-  const l = lexicon(lPlay);
   const me = room.players.find((v) => v.userId === myId);
   const isHost = room.hostId === myId;
 
   return (
     <div c="flex flex-col gap-4 lg:h-full">
-      <div c="flex items-center gap-3 rounded-xl border-2 border-blue-4 bg-white px-4 py-2.5">
-        <span c="rounded-md bg-blue-5 px-2 py-0.5 text-b3 font-black text-blue">{room.id}</span>
-        <h2 c="min-w-0 flex-1 truncate text-b1 font-bold">{room.title}</h2>
-        <MapBadge mapId={room.mapId} />
-        <Button variant="secondary" onClick={() => send({ type: "leaveRoom" })}>
-          <LogOut size={14} />
-          {l("leaveRoom")}
-        </Button>
-      </div>
+      <RoomHeader room={room} />
       <div c="grid min-h-0 flex-1 gap-4 lg:grid-cols-[1fr_22rem]">
         <div c="flex min-h-0 flex-col gap-4">
           <PlayerList room={room} />
@@ -58,6 +49,24 @@ const RoomView = ({ room }: { room: RoomDetail }) => {
   );
 };
 export default RoomView;
+
+/** 방 번호와 제목, 맵, 나가기 버튼. children은 나가기 버튼 앞에 놓인다 */
+export const RoomHeader = ({ room, children }: { room: RoomDetail; children?: ReactNode }) => {
+  const l = lexicon(lPlay);
+
+  return (
+    <div c="flex items-center gap-3 rounded-xl border-2 border-blue-4 bg-white px-4 py-2.5">
+      <span c="rounded-md bg-blue-5 px-2 py-0.5 text-b3 font-black text-blue">{room.id}</span>
+      <h2 c="min-w-0 flex-1 truncate text-b1 font-bold">{room.title}</h2>
+      <MapBadge mapId={room.mapId} />
+      {children}
+      <Button variant="secondary" onClick={() => send({ type: "leaveRoom" })}>
+        <LogOut size={14} />
+        {l("leaveRoom")}
+      </Button>
+    </div>
+  );
+};
 
 const PlayerList = ({ room }: { room: RoomDetail }) => {
   const myId = usePlayStore((s) => s.myId);

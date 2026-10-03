@@ -6,6 +6,7 @@ import { type CharacterId, MAPS, type MapId, type MapTheme } from "@monster-chor
 import { House, type LucideIcon, Trees, Waves } from "lucide-react";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 import lPlay from "@/i18n/l.play";
+import { CHARACTER_ART, FACE_ART } from "./character-art";
 
 type CValue = Parameters<typeof c>[number];
 
@@ -80,25 +81,6 @@ export const TextInput = ({
   );
 };
 
-// tailwind-base의 transformer는 중첩된 객체 리터럴의 문자열을 변형 그룹으로 바꿔 버리므로
-// 클래스 이름은 최상위 객체의 값으로만 둔다
-const CHARACTER_BODY_CLASSES: Record<CharacterId, string> = {
-  moremi: "fill-pink-2",
-  pazna: "fill-cyan-1",
-};
-
-const CHARACTER_ACCESSORIES: Record<CharacterId, ReactNode> = {
-  // 머리 위의 새싹
-  moremi: (
-    <path
-      d="M20 9 C20 5 17 2 13 2 C13 6 16 8 20 9 C20 6 23 3 27 3 C27 7 24 9 20 9Z"
-      c="fill-green"
-    />
-  ),
-  // 뾰족한 두 귀
-  pazna: <path d="M8 14 L9 3 L17 9Z M32 14 L31 3 L23 9Z" c="fill-cyan+1" />,
-};
-
 /** 캐릭터 그림이 아직 없으므로 색과 장식만 다른 동글동글한 얼굴로 대신한다 */
 export const CharacterAvatar = ({
   characterId,
@@ -107,15 +89,19 @@ export const CharacterAvatar = ({
   characterId: CharacterId;
   c?: CValue;
 }) => {
+  const art = CHARACTER_ART[characterId];
+
   return (
     <svg viewBox="0 0 40 40" aria-hidden="true" c={["size-12 shrink-0", extra]}>
-      {CHARACTER_ACCESSORIES[characterId]}
-      <ellipse cx="20" cy="23" rx="16" ry="14" c={CHARACTER_BODY_CLASSES[characterId]} />
-      <ellipse cx="14" cy="22" rx="2" ry="2.6" c="fill-gray+5" />
-      <ellipse cx="26" cy="22" rx="2" ry="2.6" c="fill-gray+5" />
-      <ellipse cx="10" cy="28" rx="3" ry="1.6" c="fill-red-2 opacity-60" />
-      <ellipse cx="30" cy="28" rx="3" ry="1.6" c="fill-red-2 opacity-60" />
-      <path d="M17 29 Q20 32 23 29" c="fill-none stroke-gray+5" strokeWidth="1.5" />
+      <path d={art.accessory.path} fill={art.accessory.fill} />
+      <ellipse {...FACE_ART.body} fill={art.body} />
+      {FACE_ART.eyes.map((v) => (
+        <ellipse key={v.cx} {...v} fill={FACE_ART.ink} />
+      ))}
+      {FACE_ART.cheeks.map((v) => (
+        <ellipse key={v.cx} {...v} fill={FACE_ART.cheek} />
+      ))}
+      <path d={FACE_ART.mouth} fill="none" stroke={FACE_ART.ink} strokeWidth="1.5" />
     </svg>
   );
 };

@@ -2,6 +2,7 @@ import I18n from "@daldalso/i18n";
 import {
   type CharacterId,
   type ErrorCode,
+  type GameResult,
   type MapId,
   NICKNAME_MAX_LENGTH,
   ROOM_TITLE_MAX_LENGTH,
@@ -27,6 +28,10 @@ const ERRORS: Record<ErrorCode, string> = {
   roomPlaying: "The game in this room has already started.",
   notHost: "Only the host can do that.",
   notAllReady: "Some players are not ready yet.",
+};
+const RESULT_REASONS: Record<GameResult["reason"], string> = {
+  timeout: "Time's up",
+  lastSurvivor: "Last one standing",
 };
 
 export default I18n.register({
@@ -72,5 +77,16 @@ export default I18n.register({
   chatPlaceholder: "Type a message",
   sendChat: "Send",
 
-  gameTbd: "TBD",
+  loadingGame: "Preparing the game…",
+  gameBoard: "Game board",
+  controls: "← ↑ → ↓ Move · Space Place kuru",
+  timeLeft: "Time left",
+  ghost: "Ghost",
+  leftGame: "Left",
+  victory: "Victory!",
+  defeat: "Defeat",
+  resultReason: (reason: GameResult["reason"]) => RESULT_REASONS[reason],
+  winners: (names: string) => `Winners: ${names}`,
+  noWinner: "No winner",
+  returningToRoom: "Returning to the room shortly.",
 });

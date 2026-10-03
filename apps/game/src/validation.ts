@@ -1,4 +1,9 @@
-import { type ClientMessage, isCharacterId, isMapId } from "@monster-chorochoro/common";
+import {
+  type ClientMessage,
+  isCharacterId,
+  isDirection,
+  isMapId,
+} from "@monster-chorochoro/common";
 
 /** 클라이언트가 보낸 문자열을 검사해 알려진 필드만 남긴 메시지로 바꾼다. 형식이 틀리면 null */
 export function parseClientMessage(data: string): ClientMessage | null {
@@ -26,7 +31,12 @@ export function parseClientMessage(data: string): ClientMessage | null {
         : null;
     case "leaveRoom":
     case "startGame":
+    case "placeKuru":
       return { type: message.type };
+    case "move":
+      return message.direction === null || isDirection(message.direction)
+        ? { type: message.type, direction: message.direction }
+        : null;
     case "selectCharacter":
       return isCharacterId(message.characterId)
         ? { type: message.type, characterId: message.characterId }

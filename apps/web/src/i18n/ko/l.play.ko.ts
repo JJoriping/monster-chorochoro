@@ -2,6 +2,7 @@ import I18n from "@daldalso/i18n";
 import {
   type CharacterId,
   type ErrorCode,
+  type GameResult,
   type MapId,
   NICKNAME_MAX_LENGTH,
   ROOM_TITLE_MAX_LENGTH,
@@ -27,6 +28,10 @@ const ERRORS: Record<ErrorCode, string> = {
   roomPlaying: "이미 게임이 시작된 방입니다.",
   notHost: "방장만 할 수 있습니다.",
   notAllReady: "아직 준비하지 않은 플레이어가 있습니다.",
+};
+const RESULT_REASONS: Record<GameResult["reason"], string> = {
+  timeout: "시간 종료",
+  lastSurvivor: "최후의 생존자",
 };
 
 export default I18n.register({
@@ -72,5 +77,16 @@ export default I18n.register({
   chatPlaceholder: "메시지를 입력하세요",
   sendChat: "전송",
 
-  gameTbd: "TBD",
+  loadingGame: "게임을 준비하는 중…",
+  gameBoard: "게임 화면",
+  controls: "← ↑ → ↓ 이동 · Space 꾸루 놓기",
+  timeLeft: "남은 시간",
+  ghost: "유령",
+  leftGame: "나감",
+  victory: "승리!",
+  defeat: "패배",
+  resultReason: (reason: GameResult["reason"]) => RESULT_REASONS[reason],
+  winners: (names: string) => `승자: ${names}`,
+  noWinner: "승자 없음",
+  returningToRoom: "잠시 후 방으로 돌아갑니다.",
 });
