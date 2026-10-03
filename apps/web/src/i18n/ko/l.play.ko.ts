@@ -1,0 +1,76 @@
+import I18n from "@daldalso/i18n";
+import {
+  type CharacterId,
+  type ErrorCode,
+  type MapId,
+  NICKNAME_MAX_LENGTH,
+  ROOM_TITLE_MAX_LENGTH,
+} from "@monster-chorochoro/common";
+
+const CHARACTER_NAMES: Record<CharacterId, string> = {
+  moremi: "모레미",
+  pazna: "파즈나",
+};
+const MAP_NAMES: Record<MapId, string> = {
+  "forest-1": "숲-1",
+  "sea-1": "바다-1",
+  "village-1": "마을-1",
+};
+const ERRORS: Record<ErrorCode, string> = {
+  invalidNickname: `닉네임은 1~${NICKNAME_MAX_LENGTH}자로 정해 주세요.`,
+  nicknameTaken: "이미 누군가 쓰고 있는 닉네임입니다.",
+  invalidRoomTitle: `방 제목은 1~${ROOM_TITLE_MAX_LENGTH}자로 정해 주세요.`,
+  alreadyInRoom: "이미 방에 들어가 있습니다.",
+  notInRoom: "방에 들어가 있지 않습니다.",
+  roomNotFound: "방이 사라졌습니다.",
+  roomFull: "방이 꽉 찼습니다.",
+  roomPlaying: "이미 게임이 시작된 방입니다.",
+  notHost: "방장만 할 수 있습니다.",
+  notAllReady: "아직 준비하지 않은 플레이어가 있습니다.",
+};
+
+export default I18n.register({
+  connecting: "서버에 연결하는 중…",
+  disconnected: "서버와 연결이 끊어졌습니다.",
+  reconnect: "다시 연결",
+  error: (code: ErrorCode) => ERRORS[code],
+  characterName: (id: CharacterId) => CHARACTER_NAMES[id],
+  mapName: (id: MapId) => MAP_NAMES[id],
+  me: "나",
+
+  roomList: "방 목록",
+  noRooms: "열린 방이 없습니다. 새로 만들어 보세요!",
+  defaultRoomTitle: (nickname: string) => `${nickname}의 방`,
+  createRoom: "방 만들기",
+  roomWaiting: "대기 중",
+  roomPlaying: "게임 중",
+  roomFull: "만원",
+  userList: "접속자",
+  inLobby: "로비",
+  inRoom: (roomId: number) => `${roomId}번 방`,
+  profile: "내 프로필",
+  nickname: "닉네임",
+  changeNickname: "변경",
+
+  leaveRoom: "나가기",
+  players: "플레이어",
+  emptySlot: "빈 자리",
+  host: "방장",
+  ready: "준비 완료",
+  notReady: "준비 중",
+  character: "캐릭터",
+  map: "맵",
+  mapHostOnly: "방장만 맵을 바꿀 수 있습니다.",
+  statPower: "파워",
+  statSpeed: "스피드",
+  statKuru: "꾸루",
+  setReady: "준비",
+  cancelReady: "준비 취소",
+  startGame: "게임 시작",
+  waitingForReady: "모든 플레이어가 준비하면 시작할 수 있습니다.",
+  chat: "채팅",
+  chatPlaceholder: "메시지를 입력하세요",
+  sendChat: "전송",
+
+  gameTbd: "TBD",
+});
