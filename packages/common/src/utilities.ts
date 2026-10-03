@@ -1,4 +1,4 @@
-/** 値を [min, max] の範囲に収める */
+/** 값을 [min, max] 범위로 제한한다 */
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }

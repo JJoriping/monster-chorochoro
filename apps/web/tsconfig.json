@@ -3,11 +3,14 @@
   "compilerOptions": {
     "lib": ["DOM", "DOM.Iterable", "ES2022"],
     "jsx": "react-jsx",
+    "jsxImportSource": "@daldalso/tailwind-base",
     "allowJs": false,
     "incremental": true,
     "plugins": [{ "name": "next" }],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@app/*": ["./app/*"],
+      "@public/*": ["./public/*"]
     }
   },
   "include": [
@@ -15,7 +18,8 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts",
+    ".next-typed-route/**/*.ts"
   ],
   "exclude": ["node_modules"]
 }

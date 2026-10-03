@@ -4,6 +4,7 @@ node_modules/
 # build outputs
 dist/
 .next/
+.next-typed-route/
 out/
 next-env.d.ts
 *.tsbuildinfo

@@ -1,6 +1,7 @@
+import type { NextTypedPage } from "@daldalso/next-typed-route";
 import { GAME_SERVER_PORT, MAX_PLAYERS_PER_ROOM } from "@monster-chorochoro/common";
 
-export default function Home() {
+const Home: NextTypedPage<"/"> = () => {
   return (
     <main>
       <h1>Monster Chorochoro</h1>
@@ -8,4 +9,5 @@ export default function Home() {
       <p>Max players per room: {MAX_PLAYERS_PER_ROOM}</p>
     </main>
   );
-}
+};
+export default Home;

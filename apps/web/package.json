@@ -4,13 +4,21 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "next typegen && next-typed-route && next dev",
+    "build": "next typegen && next-typed-route && next build",
     "start": "next start",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && next-typed-route && tsc --noEmit",
+    "typed-route": "next-typed-route --watch",
+    "tailwind-base": "tailwind-base app/globals.css"
   },
   "dependencies": {
+    "@daldalso/i18n": "^0.9.9",
+    "@daldalso/logger": "^0.9.6",
+    "@daldalso/next-typed-route": "^0.12.1",
+    "@daldalso/tailwind-base": "^0.9.3",
+    "@daldalso/tailwind-plugin": "^0.8.0",
     "@monster-chorochoro/common": "workspace:*",
+    "lucide-react": "^1.51.0",
     "next": "16.3.8",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
@@ -19,6 +27,9 @@
     "@types/node": "catalog:",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "autoprefixer": "^10.6.1",
+    "postcss": "^8.5.28",
+    "tailwindcss": "^3.4.19",
     "typescript": "catalog:"
   }
 }
