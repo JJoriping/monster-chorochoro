@@ -1,0 +1,25 @@
+{
+  "name": "monster-chorochoro",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.12.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "dev:web": "pnpm --filter @monster-chorochoro/web dev",
+    "dev:game": "pnpm --filter @monster-chorochoro/game dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "check": "biome check .",
+    "check:fix": "biome check --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "typescript": "catalog:"
+  }
+}

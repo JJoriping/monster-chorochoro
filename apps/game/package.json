@@ -1,0 +1,23 @@
+{
+  "name": "@monster-chorochoro/game",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsdown",
+    "start": "node dist/index.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@monster-chorochoro/common": "workspace:*",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/ws": "^8.18.2",
+    "tsdown": "^0.23.0",
+    "tsx": "^4.23.15",
+    "typescript": "catalog:"
+  }
+}

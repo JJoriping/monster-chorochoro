@@ -1,0 +1,11 @@
+packages:
+  - apps/*
+  - packages/*
+
+catalog:
+  typescript: 6.0.3
+  "@types/node": ^24.19.1
+
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
