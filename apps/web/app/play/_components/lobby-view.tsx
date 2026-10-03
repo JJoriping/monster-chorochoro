@@ -10,7 +10,7 @@ import {
 import { DoorOpen, Plus, UserRound, Users } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import lPlay from "@/i18n/l.play";
-import { usePlay } from "./play-provider";
+import { send, usePlayStore } from "./play-store";
 import { Button, MapBadge, Panel, TextInput } from "./ui";
 
 const LobbyView = () => {
@@ -27,7 +27,9 @@ const LobbyView = () => {
 export default LobbyView;
 
 const RoomList = () => {
-  const { rooms, users, myId, send } = usePlay();
+  const rooms = usePlayStore((s) => s.rooms);
+  const users = usePlayStore((s) => s.users);
+  const myId = usePlayStore((s) => s.myId);
   const l = lexicon(lPlay);
   const [title, setTitle] = useState("");
   const myNickname = users.find((v) => v.id === myId)?.nickname ?? "";
@@ -110,7 +112,8 @@ const RoomItem = ({ room, onJoin }: { room: RoomSummary; onJoin: () => void }) =
 };
 
 const UserList = () => {
-  const { users, myId } = usePlay();
+  const users = usePlayStore((s) => s.users);
+  const myId = usePlayStore((s) => s.myId);
   const l = lexicon(lPlay);
 
   return (
@@ -138,7 +141,8 @@ const UserList = () => {
 };
 
 const Profile = () => {
-  const { users, myId } = usePlay();
+  const users = usePlayStore((s) => s.users);
+  const myId = usePlayStore((s) => s.myId);
   const l = lexicon(lPlay);
   const me = users.find((v) => v.id === myId);
 
@@ -159,7 +163,6 @@ const Profile = () => {
 };
 
 const NicknameForm = ({ nickname }: { nickname: string }) => {
-  const { send } = usePlay();
   const l = lexicon(lPlay);
   const [value, setValue] = useState(nickname);
   const trimmed = value.trim();

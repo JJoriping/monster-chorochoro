@@ -23,11 +23,11 @@ import {
 } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import lPlay from "@/i18n/l.play";
-import { usePlay } from "./play-provider";
+import { send, usePlayStore } from "./play-store";
 import { Button, CharacterAvatar, MapBadge, MapTile, Panel, TextInput } from "./ui";
 
 const RoomView = ({ room }: { room: RoomDetail }) => {
-  const { myId, send } = usePlay();
+  const myId = usePlayStore((s) => s.myId);
   const l = lexicon(lPlay);
   const me = room.players.find((v) => v.userId === myId);
   const isHost = room.hostId === myId;
@@ -60,7 +60,7 @@ const RoomView = ({ room }: { room: RoomDetail }) => {
 export default RoomView;
 
 const PlayerList = ({ room }: { room: RoomDetail }) => {
-  const { myId } = usePlay();
+  const myId = usePlayStore((s) => s.myId);
   const l = lexicon(lPlay);
   const emptySlots = MAX_PLAYERS_PER_ROOM - room.players.length;
 
@@ -139,7 +139,6 @@ const PlayerSlot = ({
 };
 
 const CharacterSelect = ({ me }: { me: RoomPlayer }) => {
-  const { send } = usePlay();
   const l = lexicon(lPlay);
 
   return (
@@ -197,7 +196,6 @@ const StatRow = ({ label, value }: { label: string; value: number }) => {
 };
 
 const MapSelect = ({ room, isHost }: { room: RoomDetail; isHost: boolean }) => {
-  const { send } = usePlay();
   const l = lexicon(lPlay);
 
   return (
@@ -242,7 +240,6 @@ const ReadyAction = ({
   me: RoomPlayer;
   isHost: boolean;
 }) => {
-  const { send } = usePlay();
   const l = lexicon(lPlay);
 
   if (isHost) {
@@ -274,7 +271,8 @@ const ReadyAction = ({
 };
 
 const Chat = () => {
-  const { chats, myId, send } = usePlay();
+  const chats = usePlayStore((s) => s.chats);
+  const myId = usePlayStore((s) => s.myId);
   const l = lexicon(lPlay);
   const [text, setText] = useState("");
   const listRef = useRef<HTMLOListElement>(null);

@@ -5,7 +5,7 @@ import { CircleAlert, LoaderCircle, LogOut, RefreshCw, Unplug } from "lucide-rea
 import { type ReactNode, useEffect } from "react";
 import lPlay from "@/i18n/l.play";
 import LobbyView from "./lobby-view";
-import { usePlay } from "./play-provider";
+import { connect, disconnect, dismissError, send, usePlayStore } from "./play-store";
 import RoomView from "./room-view";
 import { Button } from "./ui";
 
@@ -13,6 +13,11 @@ import { Button } from "./ui";
 const ERROR_TOAST_DURATION = 3000;
 
 const PlayView = () => {
+  useEffect(() => {
+    connect();
+    return disconnect;
+  }, []);
+
   return (
     <div c="min-h-dvh bg-gradient-to-b from-blue-4 to-cyan-5 text-gray+4">
       <div c="mx-auto flex max-w-6xl flex-col gap-4 p-4 lg:h-dvh">
@@ -28,7 +33,9 @@ const PlayView = () => {
 export default PlayView;
 
 const Screen = () => {
-  const { status, myId, room, reconnect, send } = usePlay();
+  const status = usePlayStore((s) => s.status);
+  const myId = usePlayStore((s) => s.myId);
+  const room = usePlayStore((s) => s.room);
   const l = lexicon(lPlay);
 
   if (status === "closed") {
@@ -36,7 +43,7 @@ const Screen = () => {
       <Notice>
         <Unplug size={32} className="text-gray-1" />
         <p>{l("disconnected")}</p>
-        <Button onClick={reconnect}>
+        <Button onClick={connect}>
           <RefreshCw size={14} />
           {l("reconnect")}
         </Button>
@@ -74,14 +81,14 @@ const Notice = ({ children }: { children: ReactNode }) => {
 };
 
 const ErrorToast = () => {
-  const { error, dismissError } = usePlay();
+  const error = usePlayStore((s) => s.error);
   const l = lexicon(lPlay);
 
   useEffect(() => {
     if (!error) return;
     const timer = window.setTimeout(dismissError, ERROR_TOAST_DURATION);
     return () => window.clearTimeout(timer);
-  }, [error, dismissError]);
+  }, [error]);
 
   if (!error) return null;
   return (
