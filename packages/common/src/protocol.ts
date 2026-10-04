@@ -90,8 +90,8 @@ export type KuruState = {
   y: number;
   /** 굴러가는 방향 */
   direction: Direction;
-  /** 빨개진 꾸루는 장애물에 닿으면 터진다 */
-  red: boolean;
+  /** 놓인 뒤로 지난 시간. `KURU_RED_MS`를 넘으면 빨개져서 장애물에 닿으면 터진다 */
+  elapsedMs: number;
 };
 
 export type ExplosionState = {
@@ -104,6 +104,8 @@ export type ExplosionState = {
    * 폭풍이 아직 닿지 않은 범위는 지금 타일로 내다본 값이라 블록이 부서지면 늘어날 수 있다
    */
   arms: [number, number, number, number];
+  /** `DIRECTIONS` 순서로 담은, 방향별로 폭풍의 끝 칸이 블록인지. 폭풍은 그 블록을 부수기만 하고 그 칸에 머무르지 않는다 */
+  blocked: [boolean, boolean, boolean, boolean];
   elapsedMs: number;
 };
 

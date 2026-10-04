@@ -9,6 +9,8 @@ import {
   type GamePlayerState,
   getItemOfTile,
   type ItemType,
+  KURU_IDLE_FUSE_MS,
+  KURU_RED_MS,
   type KuruState,
   MAP_COLS,
   MAP_ROWS,
@@ -63,6 +65,7 @@ export function renderGame(
         to.kurus.find((w) => w.id === v.id),
         alpha,
       ),
+      v.elapsedMs + elapsedSinceFrom,
       options.now,
     );
   }
@@ -275,11 +278,13 @@ function drawKuru(
   ctx: CanvasRenderingContext2D,
   kuru: KuruState,
   position: Point,
+  elapsedMs: number,
   now: number,
 ): void {
   const center = toCanvas(position);
+  const red = elapsedMs >= KURU_RED_MS;
   // 빨개진 꾸루는 곧 터진다는 것을 알 수 있게 두근거린다
-  const radius = kuru.red ? 13 * (1 + Math.sin(now / 50) * 0.07) : 13;
+  const radius = red ? 13 * (1 + Math.sin(now / 50) * 0.07) : 13;
   ctx.fillStyle = color("gray+5", 0.15);
   ctx.beginPath();
   ctx.ellipse(center.x, center.y + 13, 11, 4, 0, 0, Math.PI * 2);
@@ -288,10 +293,30 @@ function drawKuru(
     ctx,
     center,
     radius,
-    kuru.red ? color("red-1") : color("yellow-2"),
-    kuru.red ? color("red+2") : color("orange+1"),
+    red ? color("red-1") : color("yellow-2"),
+    red ? color("red+2") : color("orange+1"),
     kuru.direction,
   );
+  if (red) drawKuruCountdown(ctx, center, KURU_RED_MS + KURU_IDLE_FUSE_MS - elapsedMs);
+}
+
+/** 빨개진 꾸루 위에 저절로 터지기까지 남은 시간을 초 단위로 띄운다 */
+function drawKuruCountdown(
+  ctx: CanvasRenderingContext2D,
+  center: Point,
+  remainingMs: number,
+): void {
+  const text = String(Math.max(1, Math.ceil(remainingMs / 1000)));
+  const y = center.y - 16;
+  ctx.font = "bold 13px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = color("white");
+  ctx.strokeText(text, center.x, y);
+  ctx.fillStyle = color("red+2");
+  ctx.fillText(text, center.x, y);
 }
 
 function drawKuruBody(
@@ -331,15 +356,15 @@ function drawKuruBody(
   }
 }
 
-/** 폭발과 함께 폭풍이 덮을 범위 전체에 붉은 그림자를 깐다 */
+/** 폭발과 함께 폭풍이 덮을 범위에 붉은 그림자를 깐다. 그림자는 그 칸에 폭풍이 닿으면 사라진다 */
 function drawWarning(
   ctx: CanvasRenderingContext2D,
   explosion: ExplosionState,
   elapsedMs: number,
 ): void {
-  if (elapsedMs >= getExplosionEndMs(explosion)) return;
   ctx.fillStyle = color("red", 0.25);
-  for (const { cell } of getExplosionCells(explosion)) {
+  for (const { cell, distance } of getExplosionCells(explosion)) {
+    if (elapsedMs >= distance * FLAME_SPREAD_MS) continue;
     ctx.beginPath();
     ctx.roundRect(cell.x * TILE_SIZE + 2, cell.y * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4, 6);
     ctx.fill();
@@ -352,7 +377,9 @@ function drawFlames(
   explosion: ExplosionState,
   elapsedMs: number,
 ): void {
-  for (const { cell, distance } of getExplosionCells(explosion)) {
+  for (const { cell, distance, blocked } of getExplosionCells(explosion)) {
+    // 폭풍은 블록을 부수기만 하고 그 칸에 머무르지 않는다
+    if (blocked) continue;
     const progress = (elapsedMs - distance * FLAME_SPREAD_MS) / FLAME_DURATION_MS;
     if (progress < 0 || progress >= 1) continue;
     const scale = progress < 0.15 ? progress / 0.15 : progress > 0.7 ? (1 - progress) / 0.3 : 1;
@@ -370,22 +397,23 @@ function drawFlames(
   }
 }
 
-function getExplosionCells(explosion: ExplosionState): { cell: Point; distance: number }[] {
-  const cells = [{ cell: { x: explosion.x, y: explosion.y }, distance: 0 }];
+/** 폭풍이 덮을 칸들. blocked는 블록을 부수고 멈추는 끝 칸인지다 */
+function getExplosionCells(
+  explosion: ExplosionState,
+): { cell: Point; distance: number; blocked: boolean }[] {
+  const cells = [{ cell: { x: explosion.x, y: explosion.y }, distance: 0, blocked: false }];
   DIRECTIONS.forEach((direction, i) => {
     const vector = DIRECTION_VECTORS[direction];
-    for (let distance = 1; distance <= (explosion.arms[i] ?? 0); distance++) {
+    const arm = explosion.arms[i] ?? 0;
+    for (let distance = 1; distance <= arm; distance++) {
       cells.push({
         cell: { x: explosion.x + vector.x * distance, y: explosion.y + vector.y * distance },
         distance,
+        blocked: distance === arm && (explosion.blocked[i] ?? false),
       });
     }
   });
   return cells;
-}
-
-function getExplosionEndMs(explosion: ExplosionState): number {
-  return Math.max(...explosion.arms) * FLAME_SPREAD_MS + FLAME_DURATION_MS;
 }
 
 function drawPlayer(

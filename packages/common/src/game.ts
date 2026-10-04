@@ -72,7 +72,7 @@ export const MOVE_SPEED_PER_LEVEL = 0.7;
 export const GHOST_MOVE_SPEED = 1.5;
 
 /** 꾸루가 앞으로 나아가는 속도 (타일/초) */
-export const KURU_MOVE_SPEED = 2;
+export const KURU_MOVE_SPEED = 1;
 
 /** 꾸루를 놓고 나서 빨개지기까지의 시간 (ms). 빨개진 꾸루는 장애물에 닿으면 터진다 */
 export const KURU_RED_MS = 2000;

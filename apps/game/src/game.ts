@@ -48,7 +48,7 @@ export type GameParticipant = {
 type GamePlayer = {
   userId: UserId;
   characterId: CharacterId;
-  /** 타일 단위 좌표. 정수일 때 타일의 한가운데에 있고, 둘 중 하나는 늘 정수다 */
+  /** 타일 단위 좌표. 정수일 때 타일의 한가운데에 있다 */
   x: number;
   y: number;
   direction: Direction;
@@ -88,6 +88,8 @@ type Explosion = {
   arms: [number, number, number, number];
   /** 방향별로 폭풍이 벽이나 블록에 막히거나 최대 길이에 닿아 더 뻗지 않게 되었는지 */
   settled: [boolean, boolean, boolean, boolean];
+  /** 방향별로 폭풍의 끝 칸이 블록인지. 폭풍은 블록을 부수기만 하고 그 칸에 머무르지 않는다 */
+  blocked: [boolean, boolean, boolean, boolean];
   /** 터진 뒤로 지난 틱 수 */
   age: number;
   /** 폭풍이 닿아 판정을 마친 거리. 처음에는 0 */
@@ -237,13 +239,14 @@ export function toSnapshot(game: Game): GameSnapshot {
       x: roundCoordinate(v.x),
       y: roundCoordinate(v.y),
       direction: v.direction,
-      red: ticksToMs(v.age) >= KURU_RED_MS,
+      elapsedMs: Math.round(ticksToMs(v.age)),
     })),
     explosions: game.explosions.map((v) => ({
       id: v.id,
       x: v.x,
       y: v.y,
       arms: [...v.arms],
+      blocked: [...v.blocked],
       elapsedMs: Math.round(ticksToMs(v.age)),
     })),
   };
@@ -256,7 +259,8 @@ export function toSnapshot(game: Game): GameSnapshot {
 
 /**
  * 플레이어를 누르고 있는 방향으로 움직인다.
- * 칸 사이에 걸쳐 있을 때는 먼저 줄을 맞추며, 막힌 쪽 대신 열린 쪽 줄로 미끄러지듯 비켜 준다.
+ * 앞이 트여 있으면 줄을 맞추지 않고 그대로 나아가며,
+ * 줄에 걸친 채로 막히면 막힌 쪽 대신 열린 쪽 줄로 미끄러지듯 비켜 준다.
  */
 function movePlayer(game: Game, player: GamePlayer): void {
   player.moving = false;
@@ -274,32 +278,31 @@ function movePlayer(game: Game, player: GamePlayer): void {
     horizontal ? isWalkable(game, m, c) : isWalkable(game, c, m);
   let remaining = (player.ghost ? GHOST_MOVE_SPEED : getMoveSpeed(player.speed)) / TICK_RATE;
 
-  const lane = Math.round(cross);
-  const offset = cross - lane;
-  if (Math.abs(offset) > EPSILON) {
-    // 줄이 어긋나 있으면 나아가는 축은 칸 한가운데에 있다
-    main = Math.round(main);
-    const neighborLane = lane + Math.sign(offset);
-    let targetLane: number;
-    if (isOpen(main + sign, lane)) targetLane = lane;
-    else if (isOpen(main + sign, neighborLane)) targetLane = neighborLane;
-    else return;
-
-    const gap = targetLane - cross;
-    const step = Math.min(Math.abs(gap), remaining);
-    cross = snap(cross + Math.sign(gap) * step);
-    remaining -= step;
-    player.moving = step > 0;
-  }
-  if (remaining > EPSILON && Math.abs(cross - Math.round(cross)) <= EPSILON) {
-    cross = Math.round(cross);
-    let next = snap(main + sign * remaining);
-    // 이동한 뒤 몸이 걸치게 되는 가장 앞쪽 칸이 막혀 있으면 그 앞 칸의 한가운데에서 멈춘다
+  /** 몸이 걸친 줄들이 모두 트여 있는 만큼 나아간다. 막히면 막힌 칸 바로 앞 칸의 한가운데에서 멈추고 true를 돌려준다 */
+  const advance = (): boolean => {
+    const next = snap(main + sign * remaining);
+    // 이동한 뒤 몸이 걸치게 되는 가장 앞쪽 칸
     const frontTile = sign > 0 ? Math.ceil(next) : Math.floor(next);
-    if (!isOpen(frontTile, cross)) next = frontTile - sign;
-    if (Math.abs(next - main) > EPSILON) player.moving = true;
-    main = next;
+    const blocked = !isOpen(frontTile, Math.floor(cross)) || !isOpen(frontTile, Math.ceil(cross));
+    const reached = blocked ? frontTile - sign : next;
+    remaining -= Math.abs(reached - main);
+    main = reached;
+    return blocked;
+  };
+
+  const from = { main, cross };
+  if (advance() && remaining > EPSILON) {
+    // 줄에 걸쳐 있으면 걸친 두 줄 가운데 앞이 트인 줄이 있다. 걸쳐 있지 않으면 둘 다 같은 줄이다
+    const targetLane = [Math.floor(cross), Math.ceil(cross)].find((v) => isOpen(main + sign, v));
+    if (targetLane !== undefined && targetLane !== cross) {
+      const gap = targetLane - cross;
+      const step = Math.min(Math.abs(gap), remaining);
+      cross = snap(cross + Math.sign(gap) * step);
+      remaining -= step;
+      if (remaining > EPSILON && cross === targetLane) advance();
+    }
   }
+  player.moving = Math.abs(main - from.main) > EPSILON || Math.abs(cross - from.cross) > EPSILON;
 
   player.x = horizontal ? main : cross;
   player.y = horizontal ? cross : main;
@@ -356,7 +359,8 @@ function moveKuru(game: Game, kuru: Kuru, distance: number): boolean {
       const y = Math.round(kuru.y);
       kuru.x = x;
       kuru.y = y;
-      if (!canKuruEnter(game, kuru, x + vector.x, y + vector.y)) return true;
+      // 꾸루끼리는 서로 지나갈 수 있으므로 벽과 블록만 장애물이다
+      if (!isWalkable(game, x + vector.x, y + vector.y)) return true;
     }
     if (remaining <= EPSILON) return false;
 
@@ -367,17 +371,6 @@ function moveKuru(game: Game, kuru: Kuru, distance: number): boolean {
     else kuru.y = next;
     remaining -= step;
   }
-}
-
-function canKuruEnter(game: Game, kuru: Kuru, x: number, y: number): boolean {
-  if (!isWalkable(game, x, y)) return false;
-  return !game.kurus.some((v) => {
-    if (v === kuru) return false;
-    if (Math.round(v.x) === x && Math.round(v.y) === y) return true;
-    // 그 칸으로 굴러 들어가는 중인 꾸루도 장애물이다
-    const target = getKuruTarget(v);
-    return target.x === x && target.y === y;
-  });
 }
 
 /** 칸 사이를 지나는 꾸루가 향하는 칸. 칸 한가운데에 있으면 그 칸이다 */
@@ -412,6 +405,7 @@ function explode(game: Game, kuru: Kuru): void {
     blastLength: kuru.blastLength,
     arms: [0, 0, 0, 0],
     settled: [false, false, false, false],
+    blocked: [false, false, false, false],
     age: 0,
     spread: 0,
   };
@@ -461,9 +455,11 @@ function spreadFlames(game: Game): void {
         if (tile === null || tile === TILES.wall) {
           explosion.arms[i] = distance - 1;
           explosion.settled[i] = true;
+          explosion.blocked[i] = false;
           return;
         }
         explosion.arms[i] = distance;
+        explosion.blocked[i] = tile === TILES.block;
         if (tile === TILES.block) broken.add(getTileIndex(x, y));
         if (tile === TILES.block || distance >= explosion.blastLength) explosion.settled[i] = true;
       });
@@ -485,6 +481,7 @@ function predictArms(game: Game, explosion: Explosion): void {
     if (explosion.settled[i]) return;
     const vector = DIRECTION_VECTORS[direction];
     let length = explosion.spread;
+    let blocked = false;
     for (let distance = explosion.spread + 1; distance <= explosion.blastLength; distance++) {
       const tile = getTile(
         game,
@@ -493,9 +490,11 @@ function predictArms(game: Game, explosion: Explosion): void {
       );
       if (tile === null || tile === TILES.wall) break;
       length = distance;
-      if (tile === TILES.block) break;
+      blocked = tile === TILES.block;
+      if (blocked) break;
     }
     explosion.arms[i] = length;
+    explosion.blocked[i] = blocked;
   });
 }
 
@@ -514,11 +513,12 @@ function getBurningTiles(game: Game): Set<number> {
   return burning;
 }
 
-/** 폭발의 중심에서 distance만큼 떨어진 폭풍 칸들 */
+/** 폭발의 중심에서 distance만큼 떨어진 폭풍 칸들. 블록을 부순 끝 칸은 빠진다 */
 function getFlameCells(explosion: Explosion, distance: number): { x: number; y: number }[] {
   if (distance === 0) return [{ x: explosion.x, y: explosion.y }];
   return DIRECTIONS.flatMap((direction, i) => {
-    if ((explosion.arms[i] ?? 0) < distance) return [];
+    const arm = explosion.arms[i] ?? 0;
+    if (arm < distance || (arm === distance && explosion.blocked[i])) return [];
     const vector = DIRECTION_VECTORS[direction];
     return [{ x: explosion.x + vector.x * distance, y: explosion.y + vector.y * distance }];
   });
