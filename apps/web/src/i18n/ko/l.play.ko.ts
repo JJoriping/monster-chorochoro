@@ -17,6 +17,8 @@ const MAP_NAMES: Record<MapId, string> = {
   "forest-1": "숲-1",
   "sea-1": "바다-1",
   "village-1": "마을-1",
+  "factory-1": "공장-1",
+  "ice-1": "얼음-1",
 };
 const ERRORS: Record<ErrorCode, string> = {
   invalidNickname: `닉네임은 1~${NICKNAME_MAX_LENGTH}자로 정해 주세요.`,
@@ -69,6 +71,8 @@ export default I18n.register({
   character: "캐릭터",
   map: "맵",
   mapHostOnly: "방장만 맵을 바꿀 수 있습니다.",
+  previous: "이전",
+  next: "다음",
   statPower: "파워",
   statSpeed: "스피드",
   statKuru: "꾸루",

@@ -1,7 +1,7 @@
 import { MAP_COLS, MAP_ROWS } from "./constants";
 import { TILES } from "./game";
 
-export type MapTheme = "forest" | "sea" | "village";
+export type MapTheme = "forest" | "sea" | "village" | "factory" | "ice";
 
 /**
  * 맵의 배치. `TILES`의 문자에 더해 숫자 1~8로 시작 위치를 나타낸다.
@@ -65,6 +65,44 @@ export const MAPS = {
       ".##BBB#.#BBB##.",
       ".##B.B...B.B##.",
       "4..BBB.6.BBB..2",
+    ],
+  },
+  // 기계가 줄지어 놓여 큰길이 좁은 길목으로 이어지는 공장
+  "factory-1": {
+    theme: "factory",
+    layout: [
+      "1.BBBB.5.BBBB.3",
+      ".####B...B####.",
+      "BBB.BB###BB.BBB",
+      "B#B.B.BBB.B.B#B",
+      "B#BBB##.##BBB#B",
+      ".#B.BB.B.BB.B#.",
+      "7.B.B##B##B.B.8",
+      ".#B.BB.B.BB.B#.",
+      "B#BBB##.##BBB#B",
+      "B#B.B.BBB.B.B#B",
+      "BBB.BB###BB.BBB",
+      ".####B...B####.",
+      "4.BBBB.6.BBBB.2",
+    ],
+  },
+  // 얼음 기둥이 비스듬히 흩어져 사방이 트인 얼음판
+  "ice-1": {
+    theme: "ice",
+    layout: [
+      "1.BBB..5..BBB.3",
+      ".#B.#B...B#.B#.",
+      "BB.B.BB#BB.B.BB",
+      ".B#BB.B.B.BB#B.",
+      "B.BB#B.#.B#BB.B",
+      ".B.B.B#.#B.B.B.",
+      "7.B#B.B.B.B#B.8",
+      ".B.B.B#.#B.B.B.",
+      "B.BB#B.#.B#BB.B",
+      ".B#BB.B.B.BB#B.",
+      "BB.B.BB#BB.B.BB",
+      ".#B.#B...B#.B#.",
+      "4.BBB..6..BBB.2",
     ],
   },
 } as const satisfies Record<string, MapDefinition>;

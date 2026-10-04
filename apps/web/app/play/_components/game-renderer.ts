@@ -41,6 +41,8 @@ const FLOOR_COLORS: Record<MapTheme, [string, string]> = {
   forest: [color("green-5"), color("green-4")],
   sea: [color("yellow-5"), color("brown-5")],
   village: [color("gray-5"), color("orange-5")],
+  factory: [color("gray-4"), color("gray-5")],
+  ice: [color("cyan-5"), color("cyan-4")],
 };
 
 const INK = color("gray+4");
@@ -164,6 +166,47 @@ function drawWall(ctx: CanvasRenderingContext2D, theme: MapTheme, left: number, 
       ctx.closePath();
       ctx.fill();
       break;
+    case "factory":
+      // 나사로 조인 쇳덩이 기계
+      ctx.fillStyle = color("gray+1");
+      ctx.fillRect(left, top, TILE_SIZE, TILE_SIZE);
+      ctx.fillStyle = color("gray-1");
+      ctx.fillRect(left + 3, top + 3, TILE_SIZE - 6, TILE_SIZE - 6);
+      ctx.fillStyle = color("yellow");
+      ctx.fillRect(left + 3, top + 17, TILE_SIZE - 6, 6);
+      ctx.fillStyle = color("gray+2");
+      for (const [x, y] of [
+        [8, 8],
+        [32, 8],
+        [8, 32],
+        [32, 32],
+      ] as const) {
+        circle(ctx, left + x, top + y, 2.5);
+        ctx.fill();
+      }
+      break;
+    case "ice":
+      // 얼음 기둥
+      ctx.fillStyle = color("cyan-2");
+      ctx.strokeStyle = color("cyan+1");
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx, top + 2);
+      ctx.lineTo(left + TILE_SIZE - 5, top + 14);
+      ctx.lineTo(left + TILE_SIZE - 8, top + TILE_SIZE - 3);
+      ctx.lineTo(left + 8, top + TILE_SIZE - 3);
+      ctx.lineTo(left + 5, top + 14);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = color("cyan-4");
+      ctx.beginPath();
+      ctx.moveTo(cx, top + 7);
+      ctx.lineTo(cx - 9, top + 15);
+      ctx.lineTo(cx - 6, top + 31);
+      ctx.closePath();
+      ctx.fill();
+      break;
   }
 }
 
@@ -219,6 +262,34 @@ function drawBlock(
       ctx.moveTo(left + 4, top + 26);
       ctx.lineTo(left + TILE_SIZE - 4, top + 26);
       ctx.stroke();
+      break;
+    case "factory":
+      // 기름통
+      ctx.fillStyle = color("orange");
+      ctx.strokeStyle = color("orange+2");
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(left + 7, top + 4, TILE_SIZE - 14, TILE_SIZE - 8, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(left + 7, top + 15);
+      ctx.lineTo(left + TILE_SIZE - 7, top + 15);
+      ctx.moveTo(left + 7, top + 25);
+      ctx.lineTo(left + TILE_SIZE - 7, top + 25);
+      ctx.stroke();
+      break;
+    case "ice":
+      // 눈덩이 더미. 테두리를 먼저 그리고 덮어 칠해 겹친 부분의 선을 지운다
+      ctx.fillStyle = color("white");
+      ctx.strokeStyle = color("blue-3");
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.ellipse(left + 20, top + 27, 16, 10, 0, 0, Math.PI * 2);
+      ctx.moveTo(left + 30, top + 15);
+      ctx.ellipse(left + 20, top + 15, 10, 8, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fill();
       break;
   }
 }

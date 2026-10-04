@@ -3,7 +3,16 @@
 import { lexicon } from "@daldalso/i18n";
 import type c from "@daldalso/tailwind-base";
 import { type CharacterId, MAPS, type MapId, type MapTheme } from "@monster-chorochoro/common";
-import { House, type LucideIcon, Trees, Waves } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Factory,
+  House,
+  type LucideIcon,
+  Snowflake,
+  Trees,
+  Waves,
+} from "lucide-react";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 import lPlay from "@/i18n/l.play";
 import { CHARACTER_ART, FACE_ART } from "./character-art";
@@ -116,12 +125,16 @@ const MAP_THEME_ICONS: Record<MapTheme, LucideIcon> = {
   forest: Trees,
   sea: Waves,
   village: House,
+  factory: Factory,
+  ice: Snowflake,
 };
 
 const MAP_THEME_CLASSES: Record<MapTheme, string> = {
   forest: "bg-green-4 text-green+2",
   sea: "bg-blue-4 text-blue+2",
   village: "bg-orange-4 text-orange+2",
+  factory: "bg-gray-4 text-gray+2",
+  ice: "bg-cyan-4 text-cyan+2",
 };
 
 export const MapBadge = ({ mapId }: { mapId: MapId }) => {
@@ -156,5 +169,104 @@ export const MapTile = ({ mapId, c: extra }: { mapId: MapId; c?: CValue }) => {
     >
       <Icon size={28} />
     </span>
+  );
+};
+
+/** 항목을 하나씩 넘겨 보는 캐러셀. 넘기면 그 항목이 바로 선택된다 */
+export const Carousel = <T extends string>({
+  items,
+  value,
+  onChange,
+  disabled,
+  renderItem,
+}: {
+  items: readonly T[];
+  value: T;
+  onChange: (value: T) => void;
+  disabled?: boolean;
+  renderItem: (item: T) => ReactNode;
+}) => {
+  const l = lexicon(lPlay);
+  const index = Math.max(items.indexOf(value), 0);
+
+  const select = (next: T) => {
+    playSound("ui-click");
+    onChange(next);
+  };
+  // 끝에서 넘기면 반대쪽 끝으로 돌아간다
+  const step = (offset: number) => {
+    select(items[(index + offset + items.length) % items.length] as T);
+  };
+
+  return (
+    <div c="flex flex-col gap-2">
+      <div c="flex items-center gap-1">
+        <CarouselArrow
+          icon={ChevronLeft}
+          label={l("previous")}
+          disabled={disabled}
+          onClick={() => step(-1)}
+        />
+        <div c="min-w-0 flex-1 overflow-hidden">
+          <div
+            c="flex transition-transform duration-300 ease-out"
+            style={{ transform: `translateX(-${index * 100}%)` }}
+          >
+            {items.map((v) => (
+              <div key={v} aria-hidden={v !== value} c="w-full shrink-0">
+                {renderItem(v)}
+              </div>
+            ))}
+          </div>
+        </div>
+        <CarouselArrow
+          icon={ChevronRight}
+          label={l("next")}
+          disabled={disabled}
+          onClick={() => step(1)}
+        />
+      </div>
+      <div c="flex justify-center gap-1.5">
+        {items.map((v, i) => (
+          <button
+            key={v}
+            type="button"
+            aria-label={`${i + 1}/${items.length}`}
+            aria-current={v === value}
+            disabled={disabled}
+            onClick={() => select(v)}
+            c={[
+              "size-2 rounded-full bg-gray-4 transition-colors disabled:cursor-default",
+              !disabled && "hover:bg-blue-3",
+              v === value && "bg-blue hover:bg-blue",
+            ]}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const CarouselArrow = ({
+  icon: Icon,
+  label,
+  disabled,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) => {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+      c="flex size-8 shrink-0 items-center justify-center rounded-full text-blue transition-colors hover:bg-blue-5 disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent"
+    >
+      <Icon size={20} />
+    </button>
   );
 };

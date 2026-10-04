@@ -24,8 +24,7 @@ import {
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import lPlay from "@/i18n/l.play";
 import { send, usePlayStore } from "./play-store";
-import { playSound } from "./sound";
-import { Button, CharacterAvatar, MapBadge, MapTile, Panel, TextInput } from "./ui";
+import { Button, Carousel, CharacterAvatar, MapBadge, MapTile, Panel, TextInput } from "./ui";
 
 const RoomView = ({ room }: { room: RoomDetail }) => {
   const myId = usePlayStore((s) => s.myId);
@@ -153,35 +152,35 @@ const CharacterSelect = ({ me }: { me: RoomPlayer }) => {
 
   return (
     <Panel title={l("character")} icon={Shirt}>
-      <div c="grid grid-cols-2 gap-2 p-3">
-        {CHARACTER_IDS.map((v) => {
-          const stats = CHARACTERS[v];
-          const selected = v === me.characterId;
+      <div c="p-3">
+        <Carousel
+          items={CHARACTER_IDS}
+          value={me.characterId}
+          onChange={(v) => send({ type: "selectCharacter", characterId: v })}
+          renderItem={(v) => {
+            const stats = CHARACTERS[v];
 
-          return (
-            <button
-              key={v}
-              type="button"
-              aria-pressed={selected}
-              onClick={() => {
-                playSound("ui-click");
-                send({ type: "selectCharacter", characterId: v });
-              }}
-              c={[
-                "flex flex-col items-center gap-1.5 rounded-lg border-2 border-gray-5 p-2.5 transition-colors hover:border-blue-3",
-                selected && "border-blue bg-blue-5 hover:border-blue",
-              ]}
-            >
-              <CharacterAvatar characterId={v} c="size-14" />
-              <span c="text-b2 font-bold">{l("characterName", v)}</span>
-              <dl c="grid w-full grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1 text-b5 text-gray+1">
-                <StatRow label={l("statPower")} initial={stats.initialPower} max={stats.maxPower} />
-                <StatRow label={l("statSpeed")} initial={stats.initialSpeed} max={stats.maxSpeed} />
-                <StatRow label={l("statKuru")} initial={stats.initialKuru} max={stats.maxKuru} />
-              </dl>
-            </button>
-          );
-        })}
+            return (
+              <div c="flex flex-col items-center gap-1.5 px-2">
+                <CharacterAvatar characterId={v} c="size-20" />
+                <span c="text-b1 font-bold">{l("characterName", v)}</span>
+                <dl c="grid w-full grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1 text-b5 text-gray+1">
+                  <StatRow
+                    label={l("statPower")}
+                    initial={stats.initialPower}
+                    max={stats.maxPower}
+                  />
+                  <StatRow
+                    label={l("statSpeed")}
+                    initial={stats.initialSpeed}
+                    max={stats.maxSpeed}
+                  />
+                  <StatRow label={l("statKuru")} initial={stats.initialKuru} max={stats.maxKuru} />
+                </dl>
+              </div>
+            );
+          }}
+        />
       </div>
     </Panel>
   );
@@ -219,34 +218,19 @@ const MapSelect = ({ room, isHost }: { room: RoomDetail; isHost: boolean }) => {
   return (
     <Panel title={l("map")} icon={MapIcon}>
       <div c="flex flex-col gap-2 p-3">
-        <div c="grid grid-cols-3 gap-2">
-          {MAP_IDS.map((v) => {
-            const selected = v === room.mapId;
-
-            return (
-              <button
-                key={v}
-                type="button"
-                aria-pressed={selected}
-                disabled={!isHost}
-                onClick={() => {
-                  playSound("ui-click");
-                  send({ type: "selectMap", mapId: v });
-                }}
-                c={[
-                  "flex flex-col gap-1 rounded-lg border-2 border-gray-5 p-1.5 transition-colors",
-                  isHost ? "hover:border-blue-3" : "cursor-default",
-                  selected && "border-blue bg-blue-5 hover:border-blue",
-                  !isHost && !selected && "opacity-40",
-                ]}
-              >
-                <MapTile mapId={v} />
-                <span c="text-b4 font-bold">{l("mapName", v)}</span>
-              </button>
-            );
-          })}
-        </div>
-        {!isHost && <p c="text-b5 text-gray">{l("mapHostOnly")}</p>}
+        <Carousel
+          items={MAP_IDS}
+          value={room.mapId}
+          disabled={!isHost}
+          onChange={(v) => send({ type: "selectMap", mapId: v })}
+          renderItem={(v) => (
+            <div c="flex flex-col items-center gap-1.5 px-2">
+              <MapTile mapId={v} c="w-32" />
+              <span c="text-b2 font-bold">{l("mapName", v)}</span>
+            </div>
+          )}
+        />
+        {!isHost && <p c="text-center text-b5 text-gray">{l("mapHostOnly")}</p>}
       </div>
     </Panel>
   );

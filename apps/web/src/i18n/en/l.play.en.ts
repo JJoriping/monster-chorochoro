@@ -17,6 +17,8 @@ const MAP_NAMES: Record<MapId, string> = {
   "forest-1": "Forest-1",
   "sea-1": "Sea-1",
   "village-1": "Village-1",
+  "factory-1": "Factory-1",
+  "ice-1": "Ice-1",
 };
 const ERRORS: Record<ErrorCode, string> = {
   invalidNickname: `Nicknames must be 1–${NICKNAME_MAX_LENGTH} characters long.`,
@@ -69,6 +71,8 @@ export default I18n.register({
   character: "Character",
   map: "Map",
   mapHostOnly: "Only the host can change the map.",
+  previous: "Previous",
+  next: "Next",
   statPower: "Power",
   statSpeed: "Speed",
   statKuru: "Kuru",

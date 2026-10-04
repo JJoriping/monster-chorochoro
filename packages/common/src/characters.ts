@@ -19,28 +19,28 @@ export const STAT_LIMIT = 6;
 
 export const CHARACTERS = {
   moremi: {
-    initialPower: 1,
-    initialSpeed: 0,
-    initialKuru: 1,
+    initialPower: 0,
+    initialSpeed: 1,
+    initialKuru: 0,
     maxPower: 5,
-    maxSpeed: 3,
+    maxSpeed: 4,
     maxKuru: 5,
   },
   pazna: {
-    initialPower: 0,
-    initialSpeed: 2,
+    initialPower: 1,
+    initialSpeed: 0,
     initialKuru: 0,
     maxPower: 3,
     maxSpeed: 6,
-    maxKuru: 4,
+    maxKuru: 5,
   },
   levisi: {
     initialPower: 0,
-    initialSpeed: 0,
-    initialKuru: 2,
-    maxPower: 4,
-    maxSpeed: 3,
-    maxKuru: 6,
+    initialSpeed: 1,
+    initialKuru: 0,
+    maxPower: 6,
+    maxSpeed: 4,
+    maxKuru: 4,
   },
 } as const satisfies Record<string, CharacterStats>;
 
