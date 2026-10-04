@@ -1,10 +1,16 @@
-/** 캐릭터별 능력치 상한. 모든 캐릭터는 0에서 시작해 필드 아이템으로 상한까지 올린다 */
+/** 캐릭터별 능력치. 초기값에서 시작해 필드 아이템으로 상한까지 올린다 */
 export type CharacterStats = {
-  /** 파워 (폭풍의 길이) */
+  /** 파워 (폭풍의 길이) 초기값 */
+  initialPower: number;
+  /** 스피드 (이동 속도) 초기값 */
+  initialSpeed: number;
+  /** 꾸루 (동시에 놓을 수 있는 꾸루의 수) 초기값 */
+  initialKuru: number;
+  /** 파워 (폭풍의 길이) 상한 */
   maxPower: number;
-  /** 스피드 (이동 속도) */
+  /** 스피드 (이동 속도) 상한 */
   maxSpeed: number;
-  /** 꾸루 (동시에 놓을 수 있는 꾸루의 수) */
+  /** 꾸루 (동시에 놓을 수 있는 꾸루의 수) 상한 */
   maxKuru: number;
 };
 
@@ -12,8 +18,30 @@ export type CharacterStats = {
 export const STAT_LIMIT = 6;
 
 export const CHARACTERS = {
-  moremi: { maxPower: 5, maxSpeed: 3, maxKuru: 5 },
-  pazna: { maxPower: 3, maxSpeed: 6, maxKuru: 4 },
+  moremi: {
+    initialPower: 1,
+    initialSpeed: 0,
+    initialKuru: 1,
+    maxPower: 5,
+    maxSpeed: 3,
+    maxKuru: 5,
+  },
+  pazna: {
+    initialPower: 0,
+    initialSpeed: 2,
+    initialKuru: 0,
+    maxPower: 3,
+    maxSpeed: 6,
+    maxKuru: 4,
+  },
+  levisi: {
+    initialPower: 0,
+    initialSpeed: 0,
+    initialKuru: 2,
+    maxPower: 4,
+    maxSpeed: 3,
+    maxKuru: 6,
+  },
 } as const satisfies Record<string, CharacterStats>;
 
 export type CharacterId = keyof typeof CHARACTERS;

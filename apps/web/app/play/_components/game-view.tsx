@@ -321,17 +321,22 @@ const ScoreRow = ({
           )}
         </span>
         <span c="flex gap-2 text-b5 tabular-nums text-gray+1">
-          <Stat icon={Zap} label={l("statPower")} value={state?.power ?? 0} max={stats.maxPower} />
+          <Stat
+            icon={Zap}
+            label={l("statPower")}
+            value={state?.power ?? stats.initialPower}
+            max={stats.maxPower}
+          />
           <Stat
             icon={ChevronsRight}
             label={l("statSpeed")}
-            value={state?.speed ?? 0}
+            value={state?.speed ?? stats.initialSpeed}
             max={stats.maxSpeed}
           />
           <Stat
             icon={CircleDot}
             label={l("statKuru")}
-            value={state?.kuru ?? 0}
+            value={state?.kuru ?? stats.initialKuru}
             max={stats.maxKuru}
           />
         </span>

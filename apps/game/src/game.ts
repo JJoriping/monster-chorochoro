@@ -134,6 +134,7 @@ export function createGame(
   const shuffledSpawns = shuffle([...spawns], random);
   const players = participants.map((v, i): GamePlayer => {
     const spawn = shuffledSpawns[i] as { x: number; y: number };
+    const stats = CHARACTERS[v.characterId];
     return {
       userId: v.userId,
       characterId: v.characterId,
@@ -144,9 +145,9 @@ export function createGame(
       moving: false,
       ghost: false,
       ghostAtTick: null,
-      power: 0,
-      speed: 0,
-      kuru: 0,
+      power: stats.initialPower,
+      speed: stats.initialSpeed,
+      kuru: stats.initialKuru,
     };
   });
 

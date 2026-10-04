@@ -175,9 +175,9 @@ const CharacterSelect = ({ me }: { me: RoomPlayer }) => {
               <CharacterAvatar characterId={v} c="size-14" />
               <span c="text-b2 font-bold">{l("characterName", v)}</span>
               <dl c="grid w-full grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1 text-b5 text-gray+1">
-                <StatRow label={l("statPower")} value={stats.maxPower} />
-                <StatRow label={l("statSpeed")} value={stats.maxSpeed} />
-                <StatRow label={l("statKuru")} value={stats.maxKuru} />
+                <StatRow label={l("statPower")} initial={stats.initialPower} max={stats.maxPower} />
+                <StatRow label={l("statSpeed")} initial={stats.initialSpeed} max={stats.maxSpeed} />
+                <StatRow label={l("statKuru")} initial={stats.initialKuru} max={stats.maxKuru} />
               </dl>
             </button>
           );
@@ -187,20 +187,25 @@ const CharacterSelect = ({ me }: { me: RoomPlayer }) => {
   );
 };
 
-const StatRow = ({ label, value }: { label: string; value: number }) => {
+/** 초기값까지는 진하게, 상한까지는 옅게 칠한 눈금 */
+const StatRow = ({ label, initial, max }: { label: string; initial: number; max: number }) => {
   return (
     <>
       <dt c="text-left">{label}</dt>
       <dd c="flex gap-0.5">
         <span c="sr-only">
-          {value}/{STAT_LIMIT}
+          {initial}→{max}/{STAT_LIMIT}
         </span>
         {Array.from({ length: STAT_LIMIT }, (_, i) => (
           <span
             // biome-ignore lint/suspicious/noArrayIndexKey: 눈금은 순서 자체가 의미다
             key={i}
             aria-hidden="true"
-            c={["h-1.5 flex-1 rounded-full bg-gray-4", i < value && "bg-orange"]}
+            c={[
+              "h-1.5 flex-1 rounded-full bg-gray-4",
+              i < max && "bg-orange-3",
+              i < initial && "bg-orange",
+            ]}
           />
         ))}
       </dd>

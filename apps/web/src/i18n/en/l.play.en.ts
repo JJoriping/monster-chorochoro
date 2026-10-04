@@ -11,6 +11,7 @@ import {
 const CHARACTER_NAMES: Record<CharacterId, string> = {
   moremi: "Moremi",
   pazna: "Pazna",
+  levisi: "Levisi",
 };
 const MAP_NAMES: Record<MapId, string> = {
   "forest-1": "Forest-1",
