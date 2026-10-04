@@ -207,7 +207,8 @@ export const Carousel = <T extends string>({
           disabled={disabled}
           onClick={() => step(-1)}
         />
-        <div c="min-w-0 flex-1 overflow-hidden">
+        {/* 너비를 0에서 늘려야 넘겨 둔 항목들의 너비가 바깥 레이아웃을 넓히지 않는다 */}
+        <div c="w-0 flex-1 overflow-hidden">
           <div
             c="flex transition-transform duration-300 ease-out"
             style={{ transform: `translateX(-${index * 100}%)` }}

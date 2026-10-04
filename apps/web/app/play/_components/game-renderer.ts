@@ -14,7 +14,10 @@ import {
   type KuruState,
   MAP_COLS,
   MAP_ROWS,
+  MAPS,
+  type MapId,
   type MapTheme,
+  parseMapLayout,
   TILES,
   type UserId,
 } from "@monster-chorochoro/common";
@@ -85,6 +88,30 @@ export function renderGame(
   }
 }
 
+/** 방에서 고른 맵을 게임과 같은 모습으로 그리고 시작 위치를 표시한다 */
+export function renderMapPreview(ctx: CanvasRenderingContext2D, mapId: MapId): void {
+  const { theme } = MAPS[mapId];
+  const { tiles, spawns } = parseMapLayout(mapId);
+
+  drawFloor(ctx, theme);
+  drawTiles(ctx, tiles, { theme, now: 0 });
+  ctx.fillStyle = color("white", 0.8);
+  ctx.strokeStyle = color("blue");
+  ctx.lineWidth = 3;
+  for (const v of spawns) {
+    const center = toCanvas(v);
+    circle(ctx, center.x, center.y, 12);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.fillStyle = color("blue");
+  for (const v of spawns) {
+    const center = toCanvas(v);
+    circle(ctx, center.x, center.y, 5);
+    ctx.fill();
+  }
+}
+
 function findPlayer(list: GamePlayerState[], userId: UserId): GamePlayerState | undefined {
   return list.find((v) => v.userId === userId);
 }
@@ -110,7 +137,11 @@ function drawFloor(ctx: CanvasRenderingContext2D, theme: MapTheme): void {
   }
 }
 
-function drawTiles(ctx: CanvasRenderingContext2D, tiles: string, options: RenderOptions): void {
+function drawTiles(
+  ctx: CanvasRenderingContext2D,
+  tiles: string,
+  options: Pick<RenderOptions, "theme" | "now">,
+): void {
   for (let i = 0; i < tiles.length; i++) {
     const tile = tiles.charAt(i);
     const left = (i % MAP_COLS) * TILE_SIZE;

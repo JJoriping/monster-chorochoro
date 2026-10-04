@@ -7,6 +7,7 @@ import {
   CHAT_MAX_LENGTH,
   MAP_IDS,
   MAX_PLAYERS_PER_ROOM,
+  type MapId,
   type RoomDetail,
   type RoomPlayer,
   STAT_LIMIT,
@@ -14,6 +15,7 @@ import {
 import {
   Check,
   Crown,
+  Eye,
   LogOut,
   Map as MapIcon,
   MessageSquare,
@@ -23,6 +25,7 @@ import {
 } from "lucide-react";
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import lPlay from "@/i18n/l.play";
+import { BOARD_HEIGHT, BOARD_WIDTH, renderMapPreview } from "./game-renderer";
 import { send, usePlayStore } from "./play-store";
 import { Button, Carousel, CharacterAvatar, MapBadge, MapTile, Panel, TextInput } from "./ui";
 
@@ -37,7 +40,10 @@ const RoomView = ({ room }: { room: RoomDetail }) => {
       <div c="grid min-h-0 flex-1 gap-4 lg:grid-cols-[1fr_22rem]">
         <div c="flex min-h-0 flex-col gap-4">
           <PlayerList room={room} />
-          <Chat />
+          <div c="grid min-h-0 gap-4 sm:grid-cols-[1fr_auto] lg:flex-1">
+            <Chat />
+            <MapPreview mapId={room.mapId} />
+          </div>
         </div>
         <div c="flex flex-col gap-4">
           {me && <CharacterSelect me={me} />}
@@ -231,6 +237,50 @@ const MapSelect = ({ room, isHost }: { room: RoomDetail; isHost: boolean }) => {
           )}
         />
         {!isHost && <p c="text-center text-b5 text-gray">{l("mapHostOnly")}</p>}
+      </div>
+    </Panel>
+  );
+};
+
+const MapPreview = ({ mapId }: { mapId: MapId }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const l = lexicon(lPlay);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+
+    // 캔버스 해상도를 바꾸면 그림이 지워지므로 크기가 바뀔 때마다 다시 그린다
+    const observer = new ResizeObserver(() => {
+      const scale = window.devicePixelRatio || 1;
+      const { width } = canvas.getBoundingClientRect();
+      canvas.width = Math.round(width * scale);
+      canvas.height = Math.round(((width * BOARD_HEIGHT) / BOARD_WIDTH) * scale);
+      ctx.setTransform(canvas.width / BOARD_WIDTH, 0, 0, canvas.height / BOARD_HEIGHT, 0, 0);
+      renderMapPreview(ctx, mapId);
+    });
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, [mapId]);
+
+  return (
+    <Panel title={l("mapPreview")} icon={Eye} action={<MapBadge mapId={mapId} />}>
+      <div c="flex flex-col items-center gap-2 p-3">
+        <canvas
+          ref={canvasRef}
+          width={BOARD_WIDTH}
+          height={BOARD_HEIGHT}
+          role="img"
+          aria-label={l("mapPreviewLabel", mapId)}
+          c="block aspect-[15/13] h-auto w-80 min-w-48 max-w-full rounded-lg lg:max-w-[calc((100dvh_-_40rem)*15/13)]"
+        />
+        <p c="flex items-center gap-1.5 self-start text-b5 text-gray+1">
+          <span aria-hidden="true" c="size-3 rounded-full border-2 border-blue bg-white p-0.5">
+            <span c="block size-full rounded-full bg-blue" />
+          </span>
+          {l("spawnPoint")}
+        </p>
       </div>
     </Panel>
   );
