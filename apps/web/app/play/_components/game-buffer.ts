@@ -34,22 +34,25 @@ export function resetGameBuffer(initialTiles: string): void {
 export function pushGameSnapshot(snapshot: GameSnapshot, receivedAt = performance.now()): void {
   if (snapshot.tiles) tiles = snapshot.tiles;
   const time = snapshot.tick * TICK_MS;
+  frames.push({ ...snapshot, tiles, time });
+  if (frames.length > FRAME_LIMIT) frames.shift();
+  // 처음 상태는 카운트다운이 끝나기 전에 오므로 시각을 맞추는 데 쓰지 않는다
+  if (snapshot.tick === 0) return;
+
   // 빨리 도착한 스냅숏일수록 실제 차이에 가까우므로 작은 쪽은 바로 따르고, 커지는 쪽은 천천히 따른다
   const offset = receivedAt - time;
   clockOffset =
     clockOffset === null || offset < clockOffset
       ? offset
       : clockOffset + (offset - clockOffset) * 0.05;
-
-  frames.push({ ...snapshot, tiles, time });
-  if (frames.length > FRAME_LIMIT) frames.shift();
 }
 
 /** now(클라이언트 시각)에 그릴 상태를 고른다. 아직 받은 스냅숏이 없으면 null */
 export function sampleGame(now: number): GameSample | null {
   const first = frames[0];
   const last = frames.at(-1);
-  if (!first || !last || clockOffset === null) return null;
+  if (!first || !last) return null;
+  if (clockOffset === null) return { from: first, to: first, alpha: 0 };
 
   const time = now - clockOffset - INTERPOLATION_DELAY_MS;
   if (time <= first.time) return { from: first, to: first, alpha: 0 };

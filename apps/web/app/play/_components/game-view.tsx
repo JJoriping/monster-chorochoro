@@ -4,11 +4,19 @@ import { lexicon } from "@daldalso/i18n";
 import {
   CHARACTERS,
   type Direction,
+  type ExplosionState,
+  FLAME_SPREAD_MS,
+  GAME_COUNTDOWN_COUNT,
+  GAME_COUNTDOWN_MS,
   type GameInfo,
   type GamePlayerInfo,
   type GamePlayerState,
+  getItemOfTile,
+  MAP_COLS,
   MAPS,
   type RoomDetail,
+  TILES,
+  type UserId,
 } from "@monster-chorochoro/common";
 import {
   ChevronsRight,
@@ -21,12 +29,13 @@ import {
   Users,
   Zap,
 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import lPlay from "@/i18n/l.play";
-import { type GameSample, sampleGame } from "./game-buffer";
+import { type GameFrame, type GameSample, sampleGame } from "./game-buffer";
 import { BOARD_HEIGHT, BOARD_WIDTH, renderGame } from "./game-renderer";
 import { send, usePlayStore } from "./play-store";
 import { RoomHeader } from "./room-view";
+import { playSound } from "./sound";
 import { CharacterAvatar, Panel } from "./ui";
 
 /** 남은 시간이 이보다 적으면 타이머를 빨갛게 보인다 (초) */
@@ -53,6 +62,7 @@ const GameView = ({ room }: { room: RoomDetail }) => {
           <div c="relative flex min-h-0 flex-col items-center justify-center gap-2 rounded-xl border-2 border-blue-4 bg-white p-3">
             <GameBoard game={game} />
             <p c="text-b4 text-gray">{l("controls")}</p>
+            <CountdownOverlay />
             <ResultOverlay game={game} />
           </div>
           <Scoreboard game={game} />
@@ -106,10 +116,23 @@ const GameBoard = ({ game }: { game: GameInfo }) => {
     observer.observe(canvas);
 
     let frame = 0;
+    let lastFrame: GameFrame | null = null;
+    const flameReaches = new Map<number, number>();
     const draw = (now: number) => {
       ctx.setTransform(canvas.width / BOARD_WIDTH, 0, 0, canvas.height / BOARD_HEIGHT, 0, 0);
       options.now = now;
-      renderGame(ctx, sampleGame(now) ?? { from: initial, to: initial, alpha: 0 }, options);
+      const sample = sampleGame(now);
+      // 효과음은 서버에서 받은 때가 아니라 화면에 그려지는 때에 맞춰 낸다
+      if (sample) {
+        if (lastFrame && sample.from !== lastFrame) playFrameSounds(lastFrame, sample.from, myId);
+        lastFrame = sample.from;
+        playFlameSounds(
+          sample.from.explosions,
+          sample.alpha * (sample.to.time - sample.from.time),
+          flameReaches,
+        );
+      }
+      renderGame(ctx, sample ?? { from: initial, to: initial, alpha: 0 }, options);
       frame = requestAnimationFrame(draw);
     };
     frame = requestAnimationFrame(draw);
@@ -130,6 +153,45 @@ const GameBoard = ({ game }: { game: GameInfo }) => {
     />
   );
 };
+
+/** 앞서 그린 프레임과 비교해 새로 일어난 일의 효과음을 낸다 */
+function playFrameSounds(prev: GameFrame, next: GameFrame, myId: UserId | null): void {
+  const kuruIds = new Set(prev.kurus.map((v) => v.id));
+  if (next.kurus.some((v) => !kuruIds.has(v.id))) playSound("kuru-set");
+
+  // 아이템은 폭풍에 사라지지 않으므로 내가 선 칸의 아이템이 사라졌으면 내가 주운 것이다
+  const me = next.players.find((v) => v.userId === myId);
+  if (!me || prev.tiles === next.tiles) return;
+  const index = Math.round(me.y) * MAP_COLS + Math.round(me.x);
+  if (getItemOfTile(prev.tiles[index] ?? "") && next.tiles[index] === TILES.empty) {
+    playSound("field-item");
+  }
+}
+
+/**
+ * 폭풍이 한 칸씩 퍼질 때마다 터지는 소리를 낸다.
+ * reaches에는 폭발마다 소리를 낸 거리를 담아 두며, 같은 프레임에 여러 칸이 퍼져도 소리는 한 번만 낸다
+ */
+function playFlameSounds(
+  explosions: ExplosionState[],
+  elapsedSinceFrom: number,
+  reaches: Map<number, number>,
+): void {
+  let popped = false;
+  for (const v of explosions) {
+    const reach = Math.min(
+      Math.floor((v.elapsedMs + elapsedSinceFrom) / FLAME_SPREAD_MS),
+      Math.max(...v.arms),
+    );
+    if (reach <= (reaches.get(v.id) ?? -1)) continue;
+    reaches.set(v.id, reach);
+    popped = true;
+  }
+  for (const id of reaches.keys()) {
+    if (!explosions.some((v) => v.id === id)) reaches.delete(id);
+  }
+  if (popped) playSound("kuru-pop");
+}
 
 /** 방향키는 가장 나중에 누른 키를 따르고, 그 키를 떼면 아직 누르고 있는 다른 키로 돌아간다 */
 function useGameControls(enabled: boolean): void {
@@ -299,13 +361,46 @@ const Stat = ({
   );
 };
 
+/** 첫 틱이 올 때까지 남은 카운트를 크게 보인다 */
+const CountdownOverlay = () => {
+  const counting = usePlayStore((s) => !s.gameState || s.gameState.tick === 0);
+  const endsAt = usePlayStore((s) => s.countdownEndsAt);
+  const [now, setNow] = useState(() => performance.now());
+
+  useEffect(() => {
+    if (!counting) return;
+    const timer = window.setInterval(() => setNow(performance.now()), 50);
+    return () => window.clearInterval(timer);
+  }, [counting]);
+
+  if (!counting) return null;
+  // 서버의 첫 틱이 조금 늦게 와도 0을 보이지 않는다
+  const count = Math.max(1, Math.ceil(((endsAt - now) / GAME_COUNTDOWN_MS) * GAME_COUNTDOWN_COUNT));
+
+  return (
+    <div c="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-white/30">
+      <span
+        role="timer"
+        c="flex size-28 items-center justify-center rounded-full border-4 border-blue-4 bg-white text-h1 font-black tabular-nums text-blue"
+      >
+        {count}
+      </span>
+    </div>
+  );
+};
+
 const ResultOverlay = ({ game }: { game: GameInfo }) => {
   const result = usePlayStore((s) => s.gameResult);
   const myId = usePlayStore((s) => s.myId);
   const l = lexicon(lPlay);
+  const won = result !== null && myId !== null && result.winnerIds.includes(myId);
+
+  useEffect(() => {
+    if (result) playSound(won ? "game-win" : "game-lose");
+  }, [result, won]);
+
   if (!result) return null;
 
-  const won = myId !== null && result.winnerIds.includes(myId);
   const winnerNames = game.players
     .filter((v) => result.winnerIds.includes(v.userId))
     .map((v) => v.nickname)

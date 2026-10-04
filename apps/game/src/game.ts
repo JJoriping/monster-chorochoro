@@ -79,11 +79,18 @@ type Explosion = {
   id: number;
   x: number;
   y: number;
-  /** `DIRECTIONS` 순서로 담은 방향별 폭풍의 길이 */
+  /** 터질 때의 파워로 정해진 폭풍의 최대 길이 */
+  blastLength: number;
+  /**
+   * `DIRECTIONS` 순서로 담은 방향별 폭풍의 길이.
+   * 폭풍이 이미 닿은 거리까지는 확정된 값이고, 그 너머는 지금 타일로 내다본 값이다
+   */
   arms: [number, number, number, number];
+  /** 방향별로 폭풍이 벽이나 블록에 막히거나 최대 길이에 닿아 더 뻗지 않게 되었는지 */
+  settled: [boolean, boolean, boolean, boolean];
   /** 터진 뒤로 지난 틱 수 */
   age: number;
-  /** 블록을 부수는 처리를 마친 거리. 처음에는 -1 */
+  /** 폭풍이 닿아 판정을 마친 거리. 처음에는 0 */
   spread: number;
 };
 
@@ -121,8 +128,10 @@ export function createGame(
       hiddenItems.set(v, ITEM_TYPES[i % ITEM_TYPES.length] as ItemType);
     });
 
-  const players = shuffle([...participants], random).map((v, i): GamePlayer => {
-    const spawn = spawns[i] as { x: number; y: number };
+  // 인원이 스폰 지점보다 적어도 늘 같은 자리에서 시작하지 않도록 스폰 지점을 섞는다
+  const shuffledSpawns = shuffle([...spawns], random);
+  const players = participants.map((v, i): GamePlayer => {
+    const spawn = shuffledSpawns[i] as { x: number; y: number };
     return {
       userId: v.userId,
       characterId: v.characterId,
@@ -163,7 +172,8 @@ export function setPlayerInput(game: Game, userId: UserId, direction: Direction 
 }
 
 export function placeKuru(game: Game, userId: UserId): void {
-  if (game.result) return;
+  // 첫 틱 전은 카운트다운 중이다
+  if (game.result || game.tick === 0) return;
   const player = game.players.find((v) => v.userId === userId);
   if (!player || player.ghost) return;
   if (game.kurus.filter((v) => v.ownerId === userId).length >= getKuruLimit(player.kuru)) return;
@@ -233,7 +243,7 @@ export function toSnapshot(game: Game): GameSnapshot {
       id: v.id,
       x: v.x,
       y: v.y,
-      arms: v.arms,
+      arms: [...v.arms],
       elapsedMs: Math.round(ticksToMs(v.age)),
     })),
   };
@@ -389,31 +399,31 @@ function isKuruAt(game: Game, x: number, y: number): boolean {
   });
 }
 
-/** 꾸루를 터뜨린다. 폭풍은 벽에서 멈추고, 블록은 부수면서 그 칸에서 멈춘다 */
+/**
+ * 꾸루를 터뜨린다. 폭풍은 벽에서 멈추고, 블록은 부수면서 그 칸에서 멈춘다.
+ * 폭풍이 어디까지 뻗을지는 터질 때가 아니라 폭풍이 각 칸에 닿는 순간의 타일로 정한다
+ */
 function explode(game: Game, kuru: Kuru): void {
   game.kurus = game.kurus.filter((v) => v !== kuru);
-  const x = Math.round(kuru.x);
-  const y = Math.round(kuru.y);
-  const arms = DIRECTIONS.map((direction) => {
-    const vector = DIRECTION_VECTORS[direction];
-    let length = 0;
-    for (let i = 1; i <= kuru.blastLength; i++) {
-      const tile = getTile(game, x + vector.x * i, y + vector.y * i);
-      if (tile === null || tile === TILES.wall) break;
-      length = i;
-      if (tile === TILES.block) break;
-    }
-    return length;
-  }) as Explosion["arms"];
-
-  game.explosions.push({ id: game.nextEntityId++, x, y, arms, age: 0, spread: -1 });
+  const explosion: Explosion = {
+    id: game.nextEntityId++,
+    x: Math.round(kuru.x),
+    y: Math.round(kuru.y),
+    blastLength: kuru.blastLength,
+    arms: [0, 0, 0, 0],
+    settled: [false, false, false, false],
+    age: 0,
+    spread: 0,
+  };
+  predictArms(game, explosion);
+  game.explosions.push(explosion);
 }
 
 function updateExplosions(game: Game): void {
   // 폭풍에 닿은 꾸루가 터지면 그 폭풍이 또 다른 꾸루를 터뜨릴 수 있으므로 더 터질 꾸루가 없을 때까지 되풀이한다
   let burning: Set<number>;
   while (true) {
-    for (const v of game.explosions) spreadFlame(game, v);
+    spreadFlames(game);
     burning = getBurningTiles(game);
     const ignited = game.kurus.filter((v) =>
       burning.has(getTileIndex(Math.round(v.x), Math.round(v.y))),
@@ -430,22 +440,63 @@ function updateExplosions(game: Game): void {
   game.explosions = game.explosions.filter((v) => ticksToMs(v.age) < getExplosionEndMs(v));
 }
 
-/** 폭풍이 새로 닿은 칸의 블록을 부순다. 블록에 숨은 아이템은 이때 드러난다 */
-function spreadFlame(game: Game, explosion: Explosion): void {
-  const reach = Math.min(
-    Math.floor(ticksToMs(explosion.age) / FLAME_SPREAD_MS),
-    Math.max(...explosion.arms),
-  );
-  for (let distance = explosion.spread + 1; distance <= reach; distance++) {
-    for (const { x, y } of getFlameCells(explosion, distance)) {
-      const index = getTileIndex(x, y);
-      if (game.tiles[index] !== TILES.block) continue;
-      const item = game.hiddenItems.get(index);
-      game.hiddenItems.delete(index);
-      setTile(game, index, item ? ITEM_TILES[item] : TILES.empty);
+/**
+ * 폭풍을 새로 닿은 칸까지 뻗고 그 칸의 블록을 부순다. 블록에 숨은 아이템은 이때 드러난다.
+ * 같은 순간에 닿은 폭풍은 모두 부서지기 전의 타일로 판정하므로, 한 블록에 함께 닿은 폭풍은 모두 그 칸에서 멈춘다
+ */
+function spreadFlames(game: Game): void {
+  const broken = new Set<number>();
+  for (const explosion of game.explosions) {
+    const reach = Math.min(
+      Math.floor(ticksToMs(explosion.age) / FLAME_SPREAD_MS),
+      explosion.blastLength,
+    );
+    for (let distance = explosion.spread + 1; distance <= reach; distance++) {
+      DIRECTIONS.forEach((direction, i) => {
+        if (explosion.settled[i]) return;
+        const vector = DIRECTION_VECTORS[direction];
+        const x = explosion.x + vector.x * distance;
+        const y = explosion.y + vector.y * distance;
+        const tile = getTile(game, x, y);
+        if (tile === null || tile === TILES.wall) {
+          explosion.arms[i] = distance - 1;
+          explosion.settled[i] = true;
+          return;
+        }
+        explosion.arms[i] = distance;
+        if (tile === TILES.block) broken.add(getTileIndex(x, y));
+        if (tile === TILES.block || distance >= explosion.blastLength) explosion.settled[i] = true;
+      });
     }
+    explosion.spread = Math.max(explosion.spread, reach);
   }
-  explosion.spread = Math.max(explosion.spread, reach);
+  for (const index of broken) {
+    const item = game.hiddenItems.get(index);
+    game.hiddenItems.delete(index);
+    setTile(game, index, item ? ITEM_TILES[item] : TILES.empty);
+  }
+  // 블록이 부서지면 다른 폭풍이 더 뻗을 수 있으므로 아직 닿지 않은 범위를 다시 내다본다
+  for (const v of game.explosions) predictArms(game, v);
+}
+
+/** 아직 폭풍이 닿지 않은 범위를 지금 타일로 내다본다. 클라이언트가 위험 범위를 미리 보이는 데 쓴다 */
+function predictArms(game: Game, explosion: Explosion): void {
+  DIRECTIONS.forEach((direction, i) => {
+    if (explosion.settled[i]) return;
+    const vector = DIRECTION_VECTORS[direction];
+    let length = explosion.spread;
+    for (let distance = explosion.spread + 1; distance <= explosion.blastLength; distance++) {
+      const tile = getTile(
+        game,
+        explosion.x + vector.x * distance,
+        explosion.y + vector.y * distance,
+      );
+      if (tile === null || tile === TILES.wall) break;
+      length = distance;
+      if (tile === TILES.block) break;
+    }
+    explosion.arms[i] = length;
+  });
 }
 
 function getBurningTiles(game: Game): Set<number> {

@@ -6,6 +6,7 @@ import {
   DEFAULT_MAP_ID,
   type Direction,
   type ErrorCode,
+  GAME_COUNTDOWN_MS,
   GAME_DURATION_MS,
   GAME_RESULT_MS,
   type GameInfo,
@@ -229,11 +230,13 @@ function startGame(user: User): ErrorCode | undefined {
   room.status = "playing";
   room.game = game;
   sendToRoom(room, { type: "gameStart", game: toGameInfo(room, game) });
+  // 카운트다운 동안에도 캐릭터가 보이도록 처음 상태를 한 번 보낸다
+  sendToRoom(room, { type: "gameState", state: toSnapshot(game) });
   broadcastRoom(room);
   broadcastLobby();
   // 타이머는 운영체제에 따라 늦게 불리기도 하므로(Windows에서는 약 15.6ms 단위) 틱 간격보다 자주 깨어나서
-  // 실제로 흐른 시간만큼 틱을 따라잡는다
-  const startedAt = performance.now();
+  // 실제로 흐른 시간만큼 틱을 따라잡는다. 카운트다운이 끝날 때까지는 첫 틱이 오지 않는다
+  const startedAt = performance.now() + GAME_COUNTDOWN_MS;
   room.gameTimer = setInterval(() => tickGame(room, startedAt), TICK_MS / 2);
 }
 

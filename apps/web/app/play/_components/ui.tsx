@@ -7,6 +7,7 @@ import { House, type LucideIcon, Trees, Waves } from "lucide-react";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 import lPlay from "@/i18n/l.play";
 import { CHARACTER_ART, FACE_ART } from "./character-art";
+import { playSound } from "./sound";
 
 type CValue = Parameters<typeof c>[number];
 
@@ -45,6 +46,7 @@ export const Button = ({
   variant = "primary",
   type = "button",
   c: extra,
+  onClick,
   ...props
 }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className"> & {
   variant?: keyof typeof BUTTON_VARIANTS;
@@ -59,6 +61,10 @@ export const Button = ({
         BUTTON_VARIANTS[variant],
         extra,
       ]}
+      onClick={(e) => {
+        playSound("ui-click");
+        onClick?.(e);
+      }}
       {...props}
     />
   );

@@ -42,6 +42,8 @@ export default I18n.register({
   characterName: (id: CharacterId) => CHARACTER_NAMES[id],
   mapName: (id: MapId) => MAP_NAMES[id],
   me: "Me",
+  mute: "Mute",
+  unmute: "Unmute",
 
   roomList: "Rooms",
   noRooms: "No rooms are open. Why not create one?",

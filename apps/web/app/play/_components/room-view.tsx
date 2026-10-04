@@ -24,6 +24,7 @@ import {
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import lPlay from "@/i18n/l.play";
 import { send, usePlayStore } from "./play-store";
+import { playSound } from "./sound";
 import { Button, CharacterAvatar, MapBadge, MapTile, Panel, TextInput } from "./ui";
 
 const RoomView = ({ room }: { room: RoomDetail }) => {
@@ -162,7 +163,10 @@ const CharacterSelect = ({ me }: { me: RoomPlayer }) => {
               key={v}
               type="button"
               aria-pressed={selected}
-              onClick={() => send({ type: "selectCharacter", characterId: v })}
+              onClick={() => {
+                playSound("ui-click");
+                send({ type: "selectCharacter", characterId: v });
+              }}
               c={[
                 "flex flex-col items-center gap-1.5 rounded-lg border-2 border-gray-5 p-2.5 transition-colors hover:border-blue-3",
                 selected && "border-blue bg-blue-5 hover:border-blue",
@@ -220,7 +224,10 @@ const MapSelect = ({ room, isHost }: { room: RoomDetail; isHost: boolean }) => {
                 type="button"
                 aria-pressed={selected}
                 disabled={!isHost}
-                onClick={() => send({ type: "selectMap", mapId: v })}
+                onClick={() => {
+                  playSound("ui-click");
+                  send({ type: "selectMap", mapId: v });
+                }}
                 c={[
                   "flex flex-col gap-1 rounded-lg border-2 border-gray-5 p-1.5 transition-colors",
                   isHost ? "hover:border-blue-3" : "cursor-default",

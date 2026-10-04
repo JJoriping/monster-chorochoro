@@ -331,14 +331,14 @@ function drawKuruBody(
   }
 }
 
-/** 폭발과 함께 폭풍이 덮을 범위 전체에 그림자를 깐다 */
+/** 폭발과 함께 폭풍이 덮을 범위 전체에 붉은 그림자를 깐다 */
 function drawWarning(
   ctx: CanvasRenderingContext2D,
   explosion: ExplosionState,
   elapsedMs: number,
 ): void {
   if (elapsedMs >= getExplosionEndMs(explosion)) return;
-  ctx.fillStyle = color("gray+5", 0.18);
+  ctx.fillStyle = color("red", 0.25);
   for (const { cell } of getExplosionCells(explosion)) {
     ctx.beginPath();
     ctx.roundRect(cell.x * TILE_SIZE + 2, cell.y * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4, 6);

@@ -53,6 +53,12 @@ export const TICK_MS = 1000 / TICK_RATE;
 /** 게임의 제한 시간 (ms) */
 export const GAME_DURATION_MS = 180_000;
 
+/** 게임을 시작하기 전에 카운트다운을 보여 주는 시간 (ms) */
+export const GAME_COUNTDOWN_MS = 1500;
+
+/** 카운트다운에 보이는 처음 숫자. 실제 시간과 관계없이 `GAME_COUNTDOWN_MS`를 이 수만큼 나눠 센다 */
+export const GAME_COUNTDOWN_COUNT = 3;
+
 /** 게임이 끝나고 결과를 보여 준 뒤 방으로 돌아가기까지의 시간 (ms) */
 export const GAME_RESULT_MS = 5000;
 
@@ -60,7 +66,7 @@ export const GAME_RESULT_MS = 5000;
 export const BASE_MOVE_SPEED = 2.5;
 
 /** 스피드 능력치 1당 늘어나는 이동 속도 (타일/초) */
-export const MOVE_SPEED_PER_LEVEL = 0.5;
+export const MOVE_SPEED_PER_LEVEL = 0.7;
 
 /** 유령의 이동 속도 (타일/초). 능력치와 관계없이 일정하다 */
 export const GHOST_MOVE_SPEED = 1.5;
@@ -75,10 +81,10 @@ export const KURU_RED_MS = 2000;
 export const KURU_IDLE_FUSE_MS = 3000;
 
 /** 폭풍이 한 칸 퍼지는 데 걸리는 시간 (ms) */
-export const FLAME_SPREAD_MS = 40;
+export const FLAME_SPREAD_MS = 150;
 
 /** 폭풍이 한 칸에 머무르는 시간 (ms) */
-export const FLAME_DURATION_MS = 500;
+export const FLAME_DURATION_MS = 300;
 
 export function getMoveSpeed(speedLevel: number): number {
   return BASE_MOVE_SPEED + MOVE_SPEED_PER_LEVEL * speedLevel;

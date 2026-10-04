@@ -42,6 +42,8 @@ export default I18n.register({
   characterName: (id: CharacterId) => CHARACTER_NAMES[id],
   mapName: (id: MapId) => MAP_NAMES[id],
   me: "나",
+  mute: "소리 끄기",
+  unmute: "소리 켜기",
 
   roomList: "방 목록",
   noRooms: "열린 방이 없습니다. 새로 만들어 보세요!",

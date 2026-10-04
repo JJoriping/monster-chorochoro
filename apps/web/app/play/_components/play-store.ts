@@ -4,6 +4,7 @@ import {
   type ChatMessage,
   type ClientMessage,
   type ErrorCode,
+  GAME_COUNTDOWN_MS,
   GAME_SERVER_PORT,
   type GameInfo,
   type GameResult,
@@ -29,6 +30,8 @@ type PlayState = {
   chats: ChatMessage[];
   /** 방이 게임 중일 때만 있다 */
   game: GameInfo | null;
+  /** 카운트다운이 끝나는 클라이언트 시각 (`performance.now()` 기준, ms) */
+  countdownEndsAt: number;
   /** 가장 최근에 받은 게임 상태. 화면에 그리는 상태는 `game-buffer`에서 따로 고른다 */
   gameState: GameSnapshot | null;
   gameResult: GameResult | null;
@@ -44,6 +47,7 @@ const INITIAL_STATE: PlayState = {
   room: null,
   chats: [],
   game: null,
+  countdownEndsAt: 0,
   gameState: null,
   gameResult: null,
   error: null,
@@ -112,7 +116,12 @@ function receive(state: PlayState, message: ServerMessage): Partial<PlayState> {
     case "chat":
       return { chats: [...state.chats, message.message].slice(-CHAT_HISTORY_LIMIT) };
     case "gameStart":
-      return { game: message.game, gameState: null, gameResult: null };
+      return {
+        game: message.game,
+        countdownEndsAt: performance.now() + GAME_COUNTDOWN_MS,
+        gameState: null,
+        gameResult: null,
+      };
     case "gameState":
       return { gameState: message.state };
     case "gameEnd":

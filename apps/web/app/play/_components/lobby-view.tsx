@@ -11,6 +11,7 @@ import { DoorOpen, Plus, UserRound, Users } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import lPlay from "@/i18n/l.play";
 import { send, usePlayStore } from "./play-store";
+import { playSound } from "./sound";
 import { Button, MapBadge, Panel, TextInput } from "./ui";
 
 const LobbyView = () => {
@@ -84,7 +85,10 @@ const RoomItem = ({ room, onJoin }: { room: RoomSummary; onJoin: () => void }) =
     <li>
       <button
         type="button"
-        onClick={onJoin}
+        onClick={() => {
+          playSound("ui-click");
+          onJoin();
+        }}
         disabled={full || playing}
         c={[
           "flex w-full items-center gap-3 rounded-lg border-2 border-blue-5 px-3 py-2.5 text-left transition-colors",

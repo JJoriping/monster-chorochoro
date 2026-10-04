@@ -99,7 +99,10 @@ export type ExplosionState = {
   /** 폭발의 중심 타일 */
   x: number;
   y: number;
-  /** `DIRECTIONS` 순서로 담은 방향별 폭풍의 길이 (칸) */
+  /**
+   * `DIRECTIONS` 순서로 담은 방향별 폭풍의 길이 (칸).
+   * 폭풍이 아직 닿지 않은 범위는 지금 타일로 내다본 값이라 블록이 부서지면 늘어날 수 있다
+   */
   arms: [number, number, number, number];
   elapsedMs: number;
 };
