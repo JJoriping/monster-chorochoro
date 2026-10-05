@@ -36,7 +36,7 @@ import { BOARD_HEIGHT, BOARD_WIDTH, renderGame } from "./game-renderer";
 import { send, usePlayStore } from "./play-store";
 import { RoomHeader } from "./room-view";
 import { playSound } from "./sound";
-import { CharacterAvatar, Panel } from "./ui";
+import { BotBadge, CharacterAvatar, Panel } from "./ui";
 
 /** 남은 시간이 이보다 적으면 타이머를 빨갛게 보인다 (초) */
 const HURRY_SECONDS = 30;
@@ -309,6 +309,7 @@ const ScoreRow = ({
           {info.userId === myId && (
             <span c="shrink-0 rounded-full bg-blue px-1.5 text-b5 text-white">{l("me")}</span>
           )}
+          {info.bot && <BotBadge />}
           {state === null && (
             <span c="shrink-0 rounded-full bg-gray-4 px-1.5 text-b5 text-gray+2">
               {l("leftGame")}

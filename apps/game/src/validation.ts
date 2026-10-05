@@ -31,8 +31,13 @@ export function parseClientMessage(data: string): ClientMessage | null {
         : null;
     case "leaveRoom":
     case "startGame":
+    case "addBot":
     case "placeKuru":
       return { type: message.type };
+    case "removeBot":
+      return typeof message.userId === "number" && Number.isInteger(message.userId)
+        ? { type: message.type, userId: message.userId }
+        : null;
     case "move":
       return message.direction === null || isDirection(message.direction)
         ? { type: message.type, direction: message.direction }

@@ -45,6 +45,7 @@ export default I18n.register({
   characterName: (id: CharacterId) => CHARACTER_NAMES[id],
   mapName: (id: MapId) => MAP_NAMES[id],
   me: "나",
+  bot: "AI",
   mute: "소리 끄기",
   unmute: "소리 켜기",
 
@@ -65,6 +66,8 @@ export default I18n.register({
   leaveRoom: "나가기",
   players: "플레이어",
   emptySlot: "빈 자리",
+  addBot: "AI 초대",
+  removeBot: (nickname: string) => `${nickname} 내보내기`,
   host: "방장",
   ready: "준비 완료",
   notReady: "준비 중",

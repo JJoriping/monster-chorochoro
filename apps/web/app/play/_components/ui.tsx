@@ -4,6 +4,7 @@ import { lexicon } from "@daldalso/i18n";
 import type c from "@daldalso/tailwind-base";
 import { type CharacterId, MAPS, type MapId, type MapTheme } from "@monster-chorochoro/common";
 import {
+  Bot,
   ChevronLeft,
   ChevronRight,
   Factory,
@@ -118,6 +119,18 @@ export const CharacterAvatar = ({
       ))}
       <path d={FACE_ART.mouth} fill="none" stroke={FACE_ART.ink} strokeWidth="1.5" />
     </svg>
+  );
+};
+
+/** 방장이 초대한 AI 플레이어임을 알리는 표시 */
+export const BotBadge = () => {
+  const l = lexicon(lPlay);
+
+  return (
+    <span c="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-purple-4 px-1.5 text-b5 font-bold text-purple+2">
+      <Bot size={10} />
+      {l("bot")}
+    </span>
   );
 };
 

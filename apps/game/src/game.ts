@@ -45,7 +45,7 @@ export type GameParticipant = {
   characterId: CharacterId;
 };
 
-type GamePlayer = {
+export type GamePlayer = {
   userId: UserId;
   characterId: CharacterId;
   /** 타일 단위 좌표. 정수일 때 타일의 한가운데에 있다 */
@@ -175,24 +175,34 @@ export function setPlayerInput(game: Game, userId: UserId, direction: Direction 
 }
 
 export function placeKuru(game: Game, userId: UserId): void {
-  // 첫 틱 전은 카운트다운 중이다
-  if (game.result || game.tick === 0) return;
   const player = game.players.find((v) => v.userId === userId);
-  if (!player || player.ghost) return;
-  if (game.kurus.filter((v) => v.ownerId === userId).length >= getKuruLimit(player.kuru)) return;
-  const x = Math.round(player.x);
-  const y = Math.round(player.y);
-  if (isKuruAt(game, x, y)) return;
+  if (player && canPlaceKuru(game, player)) {
+    game.kurus.push(createKuru(game, player, player.direction));
+  }
+}
 
-  game.kurus.push({
+export function canPlaceKuru(game: Game, player: GamePlayer): boolean {
+  // 첫 틱 전은 카운트다운 중이다
+  if (game.result || game.tick === 0 || player.ghost) return false;
+  if (getOwnKuruCount(game, player) >= getKuruLimit(player.kuru)) return false;
+  return !isKuruAt(game, Math.round(player.x), Math.round(player.y));
+}
+
+export function getOwnKuruCount(game: Game, player: GamePlayer): number {
+  return game.kurus.filter((v) => v.ownerId === player.userId).length;
+}
+
+/** 플레이어가 선 칸에 놓이는 꾸루를 만든다. 게임에 넣지는 않는다 */
+function createKuru(game: Game, player: GamePlayer, direction: Direction): Kuru {
+  return {
     id: game.nextEntityId++,
-    ownerId: userId,
-    x,
-    y,
-    direction: player.direction,
+    ownerId: player.userId,
+    x: Math.round(player.x),
+    y: Math.round(player.y),
+    direction,
     blastLength: getBlastLength(player.power),
     age: 0,
-  });
+  };
 }
 
 /** 게임 도중에 나간 플레이어를 뺀다. 이미 놓은 꾸루는 그대로 남는다 */
@@ -213,6 +223,40 @@ export function stepGame(game: Game): void {
   updateKurus(game);
   updateExplosions(game);
   game.result = judge(game);
+}
+
+/**
+ * 플레이어는 빼고 꾸루와 폭풍만 최대 ticks 틱 앞으로 진행해 본다. 실제 게임은 바뀌지 않는다.
+ * 플레이어는 꾸루와 폭풍에 영향을 주지 않으므로, 그 사이에 새 꾸루가 놓이지 않으면 내다본 대로 된다.
+ * 꾸루와 폭풍이 모두 사라지면 그 뒤로는 불탈 칸이 없으므로 일찍 멈춘다.
+ * @param onTick 진행한 틱마다 그 틱 번호와 그 틱에 불타는 칸 번호들을 받는다
+ * @param placement 주어지면 그 플레이어가 지금 선 칸에 그 방향으로 꾸루를 놓았다고 가정한다
+ * @returns 진행을 마친 뒤의 타일. 그동안 부서질 블록은 빈 칸이 된다
+ */
+export function forecastFlames(
+  game: Game,
+  ticks: number,
+  onTick: (tick: number, burning: ReadonlySet<number>) => void,
+  placement?: { player: GamePlayer; direction: Direction },
+): string[] {
+  const forecast: Game = {
+    ...game,
+    tiles: [...game.tiles],
+    // 숨은 아이템은 실제 게임에서 지우면 안 되고, 꾸루와 폭풍에는 영향이 없으므로 비워 둔다
+    hiddenItems: new Map(),
+    players: [],
+    kurus: structuredClone(game.kurus),
+    explosions: structuredClone(game.explosions),
+  };
+  if (placement) forecast.kurus.push(createKuru(forecast, placement.player, placement.direction));
+
+  for (let i = 0; i < ticks && (forecast.kurus.length || forecast.explosions.length); i++) {
+    forecast.tick++;
+    for (const v of forecast.explosions) v.age++;
+    updateKurus(forecast);
+    onTick(forecast.tick, updateExplosions(forecast));
+  }
+  return forecast.tiles;
 }
 
 export function getRemainingMs(game: Game): number {
@@ -414,7 +458,8 @@ function explode(game: Game, kuru: Kuru): void {
   game.explosions.push(explosion);
 }
 
-function updateExplosions(game: Game): void {
+/** 폭풍을 퍼뜨리고 닿은 플레이어를 유령으로 만든다. 이번 틱에 불타는 칸 번호들을 돌려준다 */
+function updateExplosions(game: Game): Set<number> {
   // 폭풍에 닿은 꾸루가 터지면 그 폭풍이 또 다른 꾸루를 터뜨릴 수 있으므로 더 터질 꾸루가 없을 때까지 되풀이한다
   let burning: Set<number>;
   while (true) {
@@ -433,6 +478,7 @@ function updateExplosions(game: Game): void {
     v.ghostAtTick = game.tick;
   }
   game.explosions = game.explosions.filter((v) => ticksToMs(v.age) < getExplosionEndMs(v));
+  return burning;
 }
 
 /**
@@ -548,7 +594,7 @@ function judge(game: Game): GameResult | null {
   return null;
 }
 
-function getTileIndex(x: number, y: number): number {
+export function getTileIndex(x: number, y: number): number {
   return y * MAP_COLS + x;
 }
 
@@ -563,7 +609,7 @@ function setTile(game: Game, index: number, tile: string): void {
 }
 
 /** 캐릭터가 지나갈 수 있는 칸인지. 꾸루와는 겹칠 수 있으므로 따지지 않는다 */
-function isWalkable(game: Game, x: number, y: number): boolean {
+export function isWalkable(game: Game, x: number, y: number): boolean {
   const tile = getTile(game, x, y);
   return tile !== null && tile !== TILES.wall && tile !== TILES.block;
 }

@@ -13,6 +13,7 @@ import {
   STAT_LIMIT,
 } from "@monster-chorochoro/common";
 import {
+  Bot,
   Check,
   Crown,
   Eye,
@@ -22,12 +23,23 @@ import {
   Send,
   Shirt,
   Users,
+  X,
 } from "lucide-react";
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import lPlay from "@/i18n/l.play";
 import { BOARD_HEIGHT, BOARD_WIDTH, renderMapPreview } from "./game-renderer";
 import { send, usePlayStore } from "./play-store";
-import { Button, Carousel, CharacterAvatar, MapBadge, MapTile, Panel, TextInput } from "./ui";
+import { playSound } from "./sound";
+import {
+  BotBadge,
+  Button,
+  Carousel,
+  CharacterAvatar,
+  MapBadge,
+  MapTile,
+  Panel,
+  TextInput,
+} from "./ui";
 
 const RoomView = ({ room }: { room: RoomDetail }) => {
   const myId = usePlayStore((s) => s.myId);
@@ -39,7 +51,7 @@ const RoomView = ({ room }: { room: RoomDetail }) => {
       <RoomHeader room={room} />
       <div c="grid min-h-0 flex-1 gap-4 lg:grid-cols-[1fr_22rem]">
         <div c="flex min-h-0 flex-col gap-4">
-          <PlayerList room={room} />
+          <PlayerList room={room} isHost={isHost} />
           <div c="grid min-h-0 gap-4 sm:grid-cols-[1fr_auto] lg:flex-1">
             <Chat />
             <MapPreview mapId={room.mapId} />
@@ -74,7 +86,7 @@ export const RoomHeader = ({ room, children }: { room: RoomDetail; children?: Re
   );
 };
 
-const PlayerList = ({ room }: { room: RoomDetail }) => {
+const PlayerList = ({ room, isHost }: { room: RoomDetail; isHost: boolean }) => {
   const myId = usePlayStore((s) => s.myId);
   const l = lexicon(lPlay);
   const emptySlots = MAX_PLAYERS_PER_ROOM - room.players.length;
@@ -84,9 +96,21 @@ const PlayerList = ({ room }: { room: RoomDetail }) => {
       title={l("players")}
       icon={Users}
       action={
-        <span c="text-b3 font-bold tabular-nums text-blue">
-          {room.players.length}/{MAX_PLAYERS_PER_ROOM}
-        </span>
+        <>
+          {isHost && (
+            <Button
+              variant="secondary"
+              disabled={!emptySlots}
+              onClick={() => send({ type: "addBot" })}
+            >
+              <Bot size={14} />
+              {l("addBot")}
+            </Button>
+          )}
+          <span c="text-b3 font-bold tabular-nums text-blue">
+            {room.players.length}/{MAX_PLAYERS_PER_ROOM}
+          </span>
+        </>
       }
     >
       <ul c="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4">
@@ -96,6 +120,10 @@ const PlayerList = ({ room }: { room: RoomDetail }) => {
             player={v}
             isHost={v.userId === room.hostId}
             isMe={v.userId === myId}
+            // 방장만 AI를 내보낼 수 있다
+            onRemove={
+              isHost && v.bot ? () => send({ type: "removeBot", userId: v.userId }) : undefined
+            }
           />
         ))}
         {Array.from({ length: emptySlots }, (_, i) => (
@@ -116,24 +144,42 @@ const PlayerSlot = ({
   player,
   isHost,
   isMe,
+  onRemove,
 }: {
   player: RoomPlayer;
   isHost: boolean;
   isMe: boolean;
+  /** 주어지면 자리 구석에 내보내기 버튼을 보인다 */
+  onRemove?: () => void;
 }) => {
   const l = lexicon(lPlay);
 
   return (
     <li
       c={[
-        "flex min-h-32 flex-col items-center justify-center gap-1 rounded-lg border-2 border-blue-5 bg-blue-5/50 p-2",
+        "relative flex min-h-32 flex-col items-center justify-center gap-1 rounded-lg border-2 border-blue-5 bg-blue-5/50 p-2",
         isMe && "border-blue-2",
       ]}
     >
+      {onRemove && (
+        <button
+          type="button"
+          aria-label={l("removeBot", player.nickname)}
+          title={l("removeBot", player.nickname)}
+          onClick={() => {
+            playSound("ui-click");
+            onRemove();
+          }}
+          c="absolute right-1 top-1 rounded-full p-1 text-gray+1 transition-colors hover:bg-red-5 hover:text-red"
+        >
+          <X size={14} />
+        </button>
+      )}
       <CharacterAvatar characterId={player.characterId} />
       <span c="flex max-w-full items-center gap-1 text-b3 font-bold">
         <span c="truncate">{player.nickname}</span>
         {isMe && <span c="shrink-0 rounded-full bg-blue px-1.5 text-b5 text-white">{l("me")}</span>}
+        {player.bot && <BotBadge />}
       </span>
       <span c="text-b4 text-gray+1">{l("characterName", player.characterId)}</span>
       {isHost ? (

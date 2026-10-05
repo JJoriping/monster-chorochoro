@@ -1,4 +1,5 @@
 import {
+  CHARACTER_IDS,
   CHAT_MAX_LENGTH,
   type CharacterId,
   type ClientMessage,
@@ -24,6 +25,7 @@ import {
   type UserSummary,
 } from "@monster-chorochoro/common";
 import { WebSocket } from "ws";
+import { type Bot, createBot, updateBot } from "./bot";
 import {
   createGame,
   type Game,
@@ -42,9 +44,12 @@ export type User = {
 };
 
 type Player = {
+  /** AI도 사람과 겹치지 않는 ID를 받지만 `users`에는 없다 */
   userId: UserId;
   characterId: CharacterId;
   ready: boolean;
+  /** AI 플레이어의 이름. 사람이면 null */
+  botName: string | null;
 };
 
 type Room = {
@@ -56,6 +61,8 @@ type Room = {
   /** 입장한 순서대로 정렬된다 */
   players: Player[];
   game: Game | null;
+  /** 게임 중인 AI들. 게임이 끝나면 비운다 */
+  bots: Bot[];
   /** 게임 중에는 틱 루프, 결과를 보여 주는 동안에는 방으로 돌아가는 타이머 */
   gameTimer: NodeJS.Timeout | null;
 };
@@ -103,6 +110,10 @@ function dispatch(user: User, message: ClientMessage): ErrorCode | undefined {
       return setReady(user, message.ready);
     case "startGame":
       return startGame(user);
+    case "addBot":
+      return addBot(user);
+    case "removeBot":
+      return removeBot(user, message.userId);
     case "chat":
       return chat(user, message.text);
     case "move":
@@ -137,6 +148,7 @@ function createRoom(user: User, value: string): ErrorCode | undefined {
     status: "waiting",
     players: [],
     game: null,
+    bots: [],
     gameTimer: null,
   };
   rooms.set(room.id, room);
@@ -154,7 +166,12 @@ function joinRoom(user: User, roomId: RoomId): ErrorCode | undefined {
 }
 
 function enterRoom(user: User, room: Room): void {
-  room.players.push({ userId: user.id, characterId: DEFAULT_CHARACTER_ID, ready: false });
+  room.players.push({
+    userId: user.id,
+    characterId: DEFAULT_CHARACTER_ID,
+    ready: false,
+    botName: null,
+  });
   user.roomId = room.id;
   broadcastRoom(room);
   broadcastLobby();
@@ -169,12 +186,13 @@ function leaveRoom(user: User): ErrorCode | undefined {
   send(user, { type: "room", room: null });
   if (room.game) removePlayer(room.game, user.id);
 
-  const [nextHost] = room.players;
+  // AI만 남은 방은 없앤다
+  const nextHost = room.players.find((v) => v.botName === null);
   if (!nextHost) {
     stopGameTimer(room);
     rooms.delete(room.id);
   } else {
-    // 방장이 나가면 가장 먼저 들어온 플레이어가 방장을 물려받는다
+    // 방장이 나가면 가장 먼저 들어온 사람이 방장을 물려받는다
     if (room.hostId === user.id) {
       room.hostId = nextHost.userId;
       nextHost.ready = false;
@@ -229,6 +247,7 @@ function startGame(user: User): ErrorCode | undefined {
   const game = createGame(room.mapId, room.players);
   room.status = "playing";
   room.game = game;
+  room.bots = room.players.filter((v) => v.botName !== null).map((v, i) => createBot(v.userId, i));
   sendToRoom(room, { type: "gameStart", game: toGameInfo(room, game) });
   // 카운트다운 동안에도 캐릭터가 보이도록 처음 상태를 한 번 보낸다
   sendToRoom(room, { type: "gameState", state: toSnapshot(game) });
@@ -245,7 +264,10 @@ function tickGame(room: Room, startedAt: number): void {
   if (!game) return;
   const dueTick = Math.floor((performance.now() - startedAt) / TICK_MS);
   if (game.tick >= dueTick) return;
-  while (game.tick < dueTick && !game.result) stepGame(game);
+  while (game.tick < dueTick && !game.result) {
+    for (const v of room.bots) updateBot(game, v);
+    stepGame(game);
+  }
   sendToRoom(room, { type: "gameState", state: toSnapshot(game) });
   if (!game.result) return;
 
@@ -254,14 +276,54 @@ function tickGame(room: Room, startedAt: number): void {
   room.gameTimer = setTimeout(() => finishGame(room), GAME_RESULT_MS);
 }
 
-/** 결과를 다 보여 주면 방을 대기 상태로 되돌린다. 방장이 아닌 플레이어는 다시 준비해야 한다 */
+/** 결과를 다 보여 주면 방을 대기 상태로 되돌린다. 방장이 아닌 사람은 다시 준비해야 한다 */
 function finishGame(room: Room): void {
   room.gameTimer = null;
   room.game = null;
+  room.bots = [];
   room.status = "waiting";
-  for (const v of room.players) v.ready = false;
+  for (const v of room.players) v.ready = v.botName !== null;
   broadcastRoom(room);
   broadcastLobby();
+}
+
+function addBot(user: User): ErrorCode | undefined {
+  const room = getRoomOf(user);
+  if (!room) return "notInRoom";
+  if (room.status !== "waiting") return "roomPlaying";
+  if (room.hostId !== user.id) return "notHost";
+  if (room.players.length >= MAX_PLAYERS_PER_ROOM) return "roomFull";
+
+  room.players.push({
+    userId: nextUserId++,
+    characterId: CHARACTER_IDS[Math.floor(Math.random() * CHARACTER_IDS.length)] as CharacterId,
+    // AI는 늘 준비되어 있다
+    ready: true,
+    botName: createBotName(room),
+  });
+  broadcastRoom(room);
+  broadcastLobby();
+}
+
+function removeBot(user: User, userId: UserId): ErrorCode | undefined {
+  const room = getRoomOf(user);
+  if (!room) return "notInRoom";
+  if (room.status !== "waiting") return "roomPlaying";
+  if (room.hostId !== user.id) return "notHost";
+  // 이미 내보낸 AI를 또 내보내려는 것은 조용히 무시한다
+  if (!room.players.some((v) => v.userId === userId && v.botName !== null)) return;
+
+  room.players = room.players.filter((v) => v.userId !== userId);
+  broadcastRoom(room);
+  broadcastLobby();
+}
+
+/** 방 안의 다른 AI와 겹치지 않는 가장 작은 번호로 이름을 붙인다 */
+function createBotName(room: Room): string {
+  for (let i = 1; ; i++) {
+    const name = `AI ${i}`;
+    if (!room.players.some((v) => v.botName === name)) return name;
+  }
 }
 
 function stopGameTimer(room: Room): void {
@@ -306,6 +368,10 @@ function getPlayer(room: Room, userId: UserId): Player | undefined {
   return room.players.find((v) => v.userId === userId);
 }
 
+function getNickname(player: Player): string {
+  return player.botName ?? users.get(player.userId)?.nickname ?? "";
+}
+
 function isNicknameTaken(nickname: string): boolean {
   for (const v of users.values()) {
     if (v.nickname === nickname) return true;
@@ -334,14 +400,16 @@ function toRoomSummary(room: Room): RoomSummary {
   };
 }
 
+/** 게임을 막 시작해 방의 플레이어와 게임의 플레이어가 같을 때 부른다 */
 function toGameInfo(room: Room, game: Game): GameInfo {
   return {
     mapId: room.mapId,
     tiles: game.tiles.join(""),
-    players: game.players.map((v) => ({
+    players: room.players.map((v) => ({
       userId: v.userId,
-      nickname: users.get(v.userId)?.nickname ?? "",
+      nickname: getNickname(v),
       characterId: v.characterId,
+      bot: v.botName !== null,
     })),
     durationMs: GAME_DURATION_MS,
   };
@@ -356,9 +424,10 @@ function toRoomDetail(room: Room): RoomDetail {
     status: room.status,
     players: room.players.map((v) => ({
       userId: v.userId,
-      nickname: users.get(v.userId)?.nickname ?? "",
+      nickname: getNickname(v),
       characterId: v.characterId,
       ready: v.ready,
+      bot: v.botName !== null,
     })),
   };
 }

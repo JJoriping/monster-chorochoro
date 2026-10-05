@@ -45,6 +45,7 @@ export default I18n.register({
   characterName: (id: CharacterId) => CHARACTER_NAMES[id],
   mapName: (id: MapId) => MAP_NAMES[id],
   me: "Me",
+  bot: "AI",
   mute: "Mute",
   unmute: "Unmute",
 
@@ -65,6 +66,8 @@ export default I18n.register({
   leaveRoom: "Leave",
   players: "Players",
   emptySlot: "Empty",
+  addBot: "Invite AI",
+  removeBot: (nickname: string) => `Remove ${nickname}`,
   host: "Host",
   ready: "Ready",
   notReady: "Not ready",

@@ -31,6 +31,8 @@ export type RoomPlayer = {
   characterId: CharacterId;
   /** 방장은 준비 상태를 쓰지 않는다 */
   ready: boolean;
+  /** 방장이 초대한 AI 플레이어인지. AI는 늘 준비되어 있다 */
+  bot: boolean;
 };
 
 /** 방 안의 플레이어에게 보이는 방 정보 */
@@ -58,6 +60,7 @@ export type GamePlayerInfo = {
   userId: UserId;
   nickname: string;
   characterId: CharacterId;
+  bot: boolean;
 };
 
 /** 게임을 시작할 때 한 번 보내는 정보 */
@@ -149,6 +152,9 @@ export type ClientMessage =
   | { type: "selectMap"; mapId: MapId }
   | { type: "setReady"; ready: boolean }
   | { type: "startGame" }
+  /** 방장만 할 수 있다. AI는 빈 자리를 하나 차지한다 */
+  | { type: "addBot" }
+  | { type: "removeBot"; userId: UserId }
   | { type: "chat"; text: string }
   /** 누르고 있는 방향이 바뀔 때마다 보낸다. 손을 떼면 null */
   | { type: "move"; direction: Direction | null }
