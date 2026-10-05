@@ -8,6 +8,7 @@ import {
   type GamePlayerInfo,
   type GamePlayerState,
   getItemOfTile,
+  type ItemDrop,
   type ItemType,
   KURU_IDLE_FUSE_MS,
   KURU_RED_MS,
@@ -36,7 +37,33 @@ export type RenderOptions = {
   myId: UserId | null;
   /** 애니메이션에 쓰는 클라이언트 시각 (ms) */
   now: number;
+  drops: DropAnimation[];
 };
+
+/** 떨어뜨린 아이템이 유령이 된 자리에서 놓일 칸까지 날아가는 애니메이션 */
+export type DropAnimation = ItemDrop & {
+  /** 날기 시작하는 클라이언트 시각 (ms) */
+  startedAt: number;
+  durationMs: number;
+};
+
+/** 떨어뜨린 아이템이 날아가는 시간 (ms). 멀리 갈수록 조금 더 걸린다 */
+const DROP_BASE_MS = 450;
+const DROP_MS_PER_TILE = 35;
+const DROP_MAX_MS = 900;
+
+/** 한꺼번에 떨어뜨린 아이템이 하나씩 튀어 나가도록 차례마다 늦추는 시간 (ms) */
+const DROP_STAGGER_MS = 70;
+
+/** order는 함께 떨어뜨린 아이템 가운데 몇 번째인지다 */
+export function createDropAnimation(drop: ItemDrop, now: number, order: number): DropAnimation {
+  const distance = Math.hypot(drop.x - drop.fromX, drop.y - drop.fromY);
+  return {
+    ...drop,
+    startedAt: now + order * DROP_STAGGER_MS,
+    durationMs: Math.min(DROP_BASE_MS + distance * DROP_MS_PER_TILE, DROP_MAX_MS),
+  };
+}
 
 type Point = { x: number; y: number };
 
@@ -58,8 +85,14 @@ export function renderGame(
   const { from, to, alpha } = sample;
   const elapsedSinceFrom = alpha * (to.time - from.time);
 
+  // 아직 날아가는 아이템은 놓일 칸에 미리 그리지 않는다
+  const landing = new Set(
+    options.drops
+      .filter((v) => options.now < v.startedAt + v.durationMs)
+      .map((v) => v.y * MAP_COLS + v.x),
+  );
   drawFloor(ctx, options.theme);
-  drawTiles(ctx, from.tiles, options);
+  drawTiles(ctx, from.tiles, options, landing);
   for (const v of from.explosions) drawWarning(ctx, v, v.elapsedMs + elapsedSinceFrom);
   for (const v of from.kurus) {
     drawKuru(
@@ -82,6 +115,7 @@ export function renderGame(
   for (const { state, position } of players) {
     drawPlayer(ctx, state, position, options);
   }
+  for (const v of options.drops) drawDrop(ctx, v, from.tiles, options.now);
   for (const { state, position } of players) {
     const info = options.players.get(state.userId);
     if (info) drawName(ctx, info.nickname, position, state.userId === options.myId);
@@ -137,10 +171,12 @@ function drawFloor(ctx: CanvasRenderingContext2D, theme: MapTheme): void {
   }
 }
 
+/** hidden에 든 칸의 아이템은 그리지 않는다 */
 function drawTiles(
   ctx: CanvasRenderingContext2D,
   tiles: string,
   options: Pick<RenderOptions, "theme" | "now">,
+  hidden: ReadonlySet<number> = new Set(),
 ): void {
   for (let i = 0; i < tiles.length; i++) {
     const tile = tiles.charAt(i);
@@ -150,7 +186,7 @@ function drawTiles(
     else if (tile === TILES.block) drawBlock(ctx, options.theme, left, top);
     else {
       const item = getItemOfTile(tile);
-      if (item) drawItem(ctx, item, left, top, options.now + i * 97);
+      if (item && !hidden.has(i)) drawItem(ctx, item, left, top, options.now + i * 97);
     }
   }
 }
@@ -376,6 +412,40 @@ function drawItem(
   ctx.restore();
 }
 
+/** 떨어뜨린 아이템은 빙글 돌며 포물선을 그려 놓일 칸에 떨어진다. 그 사이에 누가 주워 칸이 비면 그리지 않는다 */
+function drawDrop(
+  ctx: CanvasRenderingContext2D,
+  drop: DropAnimation,
+  tiles: string,
+  now: number,
+): void {
+  const progress = (now - drop.startedAt) / drop.durationMs;
+  if (progress < 0 || progress >= 1 || !getItemOfTile(tiles.charAt(drop.y * MAP_COLS + drop.x))) {
+    return;
+  }
+  const from = toCanvas({ x: drop.fromX, y: drop.fromY });
+  const to = toCanvas(drop);
+  const x = from.x + (to.x - from.x) * progress;
+  const groundY = from.y + (to.y - from.y) * progress;
+  // 멀리 날아가는 아이템일수록 높이 뜨되 보드 밖으로 너무 나가지 않게 한다
+  const distance = Math.hypot(drop.x - drop.fromX, drop.y - drop.fromY);
+  const peak = TILE_SIZE * (1 + Math.min(distance, 8) * 0.15);
+  const height = peak * 4 * progress * (1 - progress);
+
+  ctx.fillStyle = color("gray+5", 0.15);
+  ctx.beginPath();
+  ctx.ellipse(x, groundY + 14, 10, 3.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  const scale = 0.6 + progress * 0.4;
+  ctx.save();
+  ctx.translate(x, groundY - height);
+  ctx.rotate((1 - progress) * Math.PI * 2 * (to.x < from.x ? -1 : 1));
+  ctx.scale(scale, scale);
+  drawItem(ctx, drop.item, -TILE_SIZE / 2, -TILE_SIZE / 2, 0);
+  ctx.restore();
+}
+
 function drawKuru(
   ctx: CanvasRenderingContext2D,
   kuru: KuruState,
@@ -534,7 +604,7 @@ function drawPlayer(
   ctx.fill();
 
   if (state.ghost) {
-    drawGhost(ctx, center, options.now + state.userId * 300);
+    drawGhost(ctx, center, options.now + state.userId * 300, state.stunned);
     return;
   }
   const art = CHARACTER_ART[info.characterId];
@@ -542,6 +612,8 @@ function drawPlayer(
   const vector = DIRECTION_VECTORS[state.direction];
 
   ctx.save();
+  // 갓 되살아나 유령이 닿아도 괜찮은 동안에는 깜박인다
+  if (state.immune && Math.floor(options.now / 100) % 2) ctx.globalAlpha = 0.35;
   ctx.translate(center.x - 20, center.y - 22 - bob);
   ctx.fillStyle = art.accessory.fill;
   ctx.fill(getPath(art.accessory.path));
@@ -568,9 +640,14 @@ function drawPlayer(
   ctx.restore();
 }
 
-/** 유령은 봉지에 싸인 초콜릿처럼 생겼다 */
-function drawGhost(ctx: CanvasRenderingContext2D, center: Point, phase: number): void {
-  const float = Math.sin(phase / 300) * 2;
+/** 유령은 봉지에 싸인 초콜릿처럼 생겼다. 기절하면 떠다니지 않고 눈이 풀린 채 머리 위로 별이 돈다 */
+function drawGhost(
+  ctx: CanvasRenderingContext2D,
+  center: Point,
+  phase: number,
+  stunned: boolean,
+): void {
+  const float = stunned ? 0 : Math.sin(phase / 300) * 2;
   ctx.save();
   ctx.translate(center.x, center.y - 2 + float);
   ctx.globalAlpha = 0.85;
@@ -601,12 +678,47 @@ function drawGhost(ctx: CanvasRenderingContext2D, center: Point, phase: number):
   ctx.moveTo(-9, 1.5);
   ctx.lineTo(9, 1.5);
   ctx.stroke();
-  ctx.fillStyle = color("white");
-  for (const side of [-1, 1]) {
-    circle(ctx, side * 4, -2, 1.6);
-    ctx.fill();
+  if (stunned) {
+    ctx.strokeStyle = color("white");
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    for (const side of [-1, 1]) {
+      ctx.moveTo(side * 4 - 1.6, -3.6);
+      ctx.lineTo(side * 4 + 1.6, -0.4);
+      ctx.moveTo(side * 4 + 1.6, -3.6);
+      ctx.lineTo(side * 4 - 1.6, -0.4);
+    }
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = color("white");
+    for (const side of [-1, 1]) {
+      circle(ctx, side * 4, -2, 1.6);
+      ctx.fill();
+    }
   }
   ctx.restore();
+  if (stunned) drawStunStars(ctx, center, phase);
+}
+
+/** 기절한 유령의 머리 위를 맴도는 별 세 개 */
+function drawStunStars(ctx: CanvasRenderingContext2D, center: Point, phase: number): void {
+  ctx.fillStyle = color("yellow");
+  ctx.strokeStyle = color("orange+1");
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 3; i++) {
+    const angle = phase / 200 + (i * Math.PI * 2) / 3;
+    const x = center.x + Math.cos(angle) * 12;
+    const y = center.y - 19 + Math.sin(angle) * 3.5;
+    ctx.beginPath();
+    for (let j = 0; j < 10; j++) {
+      const radius = j % 2 ? 1.6 : 4;
+      const pointAngle = -Math.PI / 2 + (j * Math.PI) / 5;
+      ctx.lineTo(x + Math.cos(pointAngle) * radius, y + Math.sin(pointAngle) * radius);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
 }
 
 /** 이름은 머리 위에 쓰되, 맨 윗줄에서는 발밑에 쓰고 좌우 끝에서는 보드 안으로 밀어 넣는다 */

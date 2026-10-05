@@ -71,6 +71,12 @@ export const MOVE_SPEED_PER_LEVEL = 0.7;
 /** 유령의 이동 속도 (타일/초). 능력치와 관계없이 일정하다 */
 export const GHOST_MOVE_SPEED = 1.5;
 
+/** 유령이 폭풍에 맞으면 움직이지 못하는 시간 (ms). 폭풍 안에 있는 동안은 계속 늘어난다 */
+export const GHOST_STUN_MS = 1500;
+
+/** 유령이 산 플레이어에게 닿아 되살아난 뒤 다른 유령이 닿아도 유령이 되지 않는 시간 (ms) */
+export const REVIVE_IMMUNITY_MS = 2000;
+
 /** 꾸루가 앞으로 나아가는 속도 (타일/초) */
 export const KURU_MOVE_SPEED = 1;
 

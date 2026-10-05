@@ -1,5 +1,5 @@
 import type { CharacterId } from "./characters";
-import type { Direction } from "./game";
+import type { Direction, ItemType } from "./game";
 import type { MapId } from "./maps";
 
 export type UserId = number;
@@ -81,6 +81,10 @@ export type GamePlayerState = {
   direction: Direction;
   moving: boolean;
   ghost: boolean;
+  /** 유령이 폭풍에 맞아 기절해 움직이지 못하는지 */
+  stunned: boolean;
+  /** 되살아난 지 얼마 안 되어 유령이 닿아도 유령이 되지 않는지 */
+  immune: boolean;
   /** 아이템으로 올린 능력치 */
   power: number;
   speed: number;
@@ -112,6 +116,17 @@ export type ExplosionState = {
   elapsedMs: number;
 };
 
+/** 폭풍에 맞아 유령이 된 플레이어가 떨어뜨린 아이템 하나 */
+export type ItemDrop = {
+  item: ItemType;
+  /** 떨어뜨린 플레이어가 유령이 된 자리 */
+  fromX: number;
+  fromY: number;
+  /** 아이템이 놓인 타일 */
+  x: number;
+  y: number;
+};
+
 /** 매 틱 보내는 게임 상태 */
 export type GameSnapshot = {
   tick: number;
@@ -122,6 +137,8 @@ export type GameSnapshot = {
   explosions: ExplosionState[];
   /** 타일이 바뀐 틱에만 들어 있다 */
   tiles?: string;
+  /** 지난 스냅숏 뒤로 아이템을 떨어뜨렸을 때만 들어 있다. 아이템은 이미 `tiles`에 놓여 있다 */
+  drops?: ItemDrop[];
 };
 
 export type GameResult = {

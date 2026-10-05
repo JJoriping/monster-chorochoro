@@ -47,6 +47,11 @@ export function pushGameSnapshot(snapshot: GameSnapshot, receivedAt = performanc
       : clockOffset + (offset - clockOffset) * 0.05;
 }
 
+/** prev 다음부터 next까지의 스냅숏들. 그리는 동안 건너뛴 스냅숏의 일도 놓치지 않으려고 쓴다 */
+export function getFramesBetween(prev: GameFrame, next: GameFrame): GameFrame[] {
+  return frames.filter((v) => v.time > prev.time && v.time <= next.time);
+}
+
 /** now(클라이언트 시각)에 그릴 상태를 고른다. 아직 받은 스냅숏이 없으면 null */
 export function sampleGame(now: number): GameSample | null {
   const first = frames[0];

@@ -10,11 +10,13 @@ import {
   type GameResult,
   type GameSnapshot,
   GHOST_MOVE_SPEED,
+  GHOST_STUN_MS,
   getBlastLength,
   getItemOfTile,
   getKuruLimit,
   getMoveSpeed,
   ITEM_TYPES,
+  type ItemDrop,
   type ItemType,
   KURU_IDLE_FUSE_MS,
   KURU_MOVE_SPEED,
@@ -23,6 +25,7 @@ import {
   MAP_ROWS,
   type MapId,
   parseMapLayout,
+  REVIVE_IMMUNITY_MS,
   TICK_RATE,
   TILES,
   type UserId,
@@ -33,6 +36,15 @@ const EPSILON = 1e-6;
 
 /** 블록 중 아이템이 들어 있는 블록의 비율 */
 const ITEM_BLOCK_RATIO = 0.35;
+
+/** 폭풍에 맞아 유령이 될 때 주운 아이템 가운데 떨어뜨리는 비율 */
+const ITEM_DROP_RATIO = 0.3;
+
+/** 유령과 산 플레이어의 좌표 차이가 두 축 모두 이보다 작으면 닿은 것으로 본다 (타일) */
+const GHOST_TOUCH_DISTANCE = 0.6;
+
+const GHOST_STUN_TICKS = Math.round((GHOST_STUN_MS * TICK_RATE) / 1000);
+const REVIVE_IMMUNITY_TICKS = Math.round((REVIVE_IMMUNITY_MS * TICK_RATE) / 1000);
 
 const ITEM_TILES: Record<ItemType, string> = {
   power: TILES.power,
@@ -58,6 +70,10 @@ export type GamePlayer = {
   ghost: boolean;
   /** 유령이 된 틱. 동시에 탈락한 플레이어를 가리는 데 쓴다 */
   ghostAtTick: number | null;
+  /** 폭풍에 맞은 유령은 이 틱까지 기절해 움직이지 못한다 */
+  stunnedUntilTick: number;
+  /** 되살아난 플레이어는 이 틱까지 유령이 닿아도 유령이 되지 않는다 */
+  immuneUntilTick: number;
   power: number;
   speed: number;
   kuru: number;
@@ -108,8 +124,12 @@ export type Game = {
   explosions: Explosion[];
   tick: number;
   tilesChanged: boolean;
+  /** 아직 클라이언트에 알리지 않은, 떨어뜨린 아이템들 */
+  drops: ItemDrop[];
   result: GameResult | null;
   nextEntityId: number;
+  /** 떨어뜨린 아이템이 놓일 자리를 고르는 데 쓴다 */
+  random: () => number;
 };
 
 export function createGame(
@@ -145,6 +165,8 @@ export function createGame(
       moving: false,
       ghost: false,
       ghostAtTick: null,
+      stunnedUntilTick: 0,
+      immuneUntilTick: 0,
       power: stats.initialPower,
       speed: stats.initialSpeed,
       kuru: stats.initialKuru,
@@ -161,8 +183,10 @@ export function createGame(
     explosions: [],
     tick: 0,
     tilesChanged: false,
+    drops: [],
     result: null,
     nextEntityId: 1,
+    random,
   };
 }
 
@@ -222,7 +246,18 @@ export function stepGame(game: Game): void {
   for (const v of game.explosions) v.age++;
   updateKurus(game);
   updateExplosions(game);
+  reviveGhosts(game);
   game.result = judge(game);
+}
+
+/** 폭풍에 맞은 유령이 아직 기절해 있어 다음 틱에 움직이지 못하는지 */
+function isStunned(game: Game, player: GamePlayer): boolean {
+  return player.ghost && game.tick < player.stunnedUntilTick;
+}
+
+/** 갓 되살아나 다음 틱에 유령이 닿아도 유령이 되지 않는지 */
+export function isImmune(game: Game, player: GamePlayer): boolean {
+  return !player.ghost && game.tick < player.immuneUntilTick;
 }
 
 /**
@@ -275,6 +310,8 @@ export function toSnapshot(game: Game): GameSnapshot {
       direction: v.direction,
       moving: v.moving,
       ghost: v.ghost,
+      stunned: isStunned(game, v),
+      immune: isImmune(game, v),
       power: v.power,
       speed: v.speed,
       kuru: v.kuru,
@@ -299,6 +336,10 @@ export function toSnapshot(game: Game): GameSnapshot {
     snapshot.tiles = game.tiles.join("");
     game.tilesChanged = false;
   }
+  if (game.drops.length) {
+    snapshot.drops = game.drops;
+    game.drops = [];
+  }
   return snapshot;
 }
 
@@ -310,7 +351,7 @@ export function toSnapshot(game: Game): GameSnapshot {
 function movePlayer(game: Game, player: GamePlayer): void {
   player.moving = false;
   const direction = player.input;
-  if (!direction) return;
+  if (!direction || (player.ghost && game.tick <= player.stunnedUntilTick)) return;
   player.direction = direction;
 
   const vector = DIRECTION_VECTORS[direction];
@@ -458,7 +499,10 @@ function explode(game: Game, kuru: Kuru): void {
   game.explosions.push(explosion);
 }
 
-/** 폭풍을 퍼뜨리고 닿은 플레이어를 유령으로 만든다. 이번 틱에 불타는 칸 번호들을 돌려준다 */
+/**
+ * 폭풍을 퍼뜨리고 닿은 플레이어를 유령으로 만들며, 닿은 유령은 기절시킨다.
+ * 이번 틱에 불타는 칸 번호들을 돌려준다
+ */
 function updateExplosions(game: Game): Set<number> {
   // 폭풍에 닿은 꾸루가 터지면 그 폭풍이 또 다른 꾸루를 터뜨릴 수 있으므로 더 터질 꾸루가 없을 때까지 되풀이한다
   let burning: Set<number>;
@@ -473,9 +517,14 @@ function updateExplosions(game: Game): Set<number> {
   }
 
   for (const v of game.players) {
-    if (v.ghost || !burning.has(getTileIndex(Math.round(v.x), Math.round(v.y)))) continue;
-    v.ghost = true;
-    v.ghostAtTick = game.tick;
+    if (!burning.has(getTileIndex(Math.round(v.x), Math.round(v.y)))) continue;
+    if (!v.ghost) {
+      v.ghost = true;
+      v.ghostAtTick = game.tick;
+      dropItems(game, v);
+    }
+    // 갓 유령이 된 플레이어도 폭풍 안에 있으므로 기절해서, 곧바로 다른 플레이어에게 닿아 되살아나지 못한다
+    v.stunnedUntilTick = game.tick + GHOST_STUN_TICKS;
   }
   game.explosions = game.explosions.filter((v) => ticksToMs(v.age) < getExplosionEndMs(v));
   return burning;
@@ -573,6 +622,69 @@ function getFlameCells(explosion: Explosion, distance: number): { x: number; y: 
 
 function getExplosionEndMs(explosion: Explosion): number {
   return Math.max(...explosion.arms) * FLAME_SPREAD_MS + FLAME_DURATION_MS;
+}
+
+/**
+ * 주운 아이템 가운데 일부를 맵의 빈 칸 아무 데나 떨어뜨리고 그만큼 능력치를 내린다.
+ * 산 플레이어가 선 칸에는 떨어뜨리지 않으며, 빈 칸이 모자라면 남은 아이템은 떨어뜨리지 않고 그대로 둔다
+ */
+function dropItems(game: Game, player: GamePlayer): void {
+  const stats = CHARACTERS[player.characterId];
+  const initial: Record<ItemType, number> = {
+    power: stats.initialPower,
+    speed: stats.initialSpeed,
+    kuru: stats.initialKuru,
+  };
+  // 상한에 닿은 뒤에 주운 아이템은 능력치를 올리지 않았으므로 초기값보다 오른 만큼만 가진 것으로 본다
+  const owned = ITEM_TYPES.flatMap((v) => new Array<ItemType>(player[v] - initial[v]).fill(v));
+  const count = Math.round(owned.length * ITEM_DROP_RATIO);
+  if (!count) return;
+
+  const occupied = new Set(
+    game.players.filter((v) => !v.ghost).map((v) => getTileIndex(Math.round(v.x), Math.round(v.y))),
+  );
+  const spots = shuffle(
+    game.tiles.flatMap((v, i) => (v === TILES.empty && !occupied.has(i) ? [i] : [])),
+    game.random,
+  );
+  shuffle(owned, game.random)
+    .slice(0, Math.min(count, spots.length))
+    .forEach((item, i) => {
+      const index = spots[i] as number;
+      player[item]--;
+      setTile(game, index, ITEM_TILES[item]);
+      game.drops.push({
+        item,
+        fromX: roundCoordinate(player.x),
+        fromY: roundCoordinate(player.y),
+        x: index % MAP_COLS,
+        y: Math.floor(index / MAP_COLS),
+      });
+    });
+}
+
+/**
+ * 유령이 산 플레이어에게 닿으면 그 플레이어가 유령이 되고 유령은 그 자리에서 되살아난다.
+ * 기절한 유령은 되살아나지 못하고, 갓 되살아난 플레이어에게는 잠시 유령이 닿아도 소용없다
+ */
+function reviveGhosts(game: Game): void {
+  // 이번에 닿아서 유령이 된 플레이어는 다음 틱부터 따진다
+  const ghosts = game.players.filter((v) => v.ghost && game.tick > v.stunnedUntilTick);
+  for (const ghost of ghosts) {
+    const target = game.players.find(
+      (v) =>
+        !v.ghost &&
+        game.tick > v.immuneUntilTick &&
+        Math.abs(v.x - ghost.x) < GHOST_TOUCH_DISTANCE &&
+        Math.abs(v.y - ghost.y) < GHOST_TOUCH_DISTANCE,
+    );
+    if (!target) continue;
+    target.ghost = true;
+    target.ghostAtTick = game.tick;
+    ghost.ghost = false;
+    ghost.ghostAtTick = null;
+    ghost.immuneUntilTick = game.tick + REVIVE_IMMUNITY_TICKS;
+  }
 }
 
 /**

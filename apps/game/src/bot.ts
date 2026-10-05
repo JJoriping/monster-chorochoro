@@ -26,6 +26,7 @@ import {
   type Game,
   type GamePlayer,
   getTileIndex,
+  isImmune,
   isWalkable,
   placeKuru,
   setPlayerInput,
@@ -53,7 +54,7 @@ const SAFETY_MARGINS = [3, 1, 0] as const;
 /** 꾸루를 놓으려다 그만둔 칸을 다시 노리지 않는 시간 (틱) */
 const COOLDOWN_TICKS = 2 * TICK_RATE;
 
-/** 유령이 판단할 때마다 새로 돌아다니기 시작할 확률 */
+/** 쫓을 플레이어가 없는 유령이 판단할 때마다 새로 돌아다니기 시작할 확률 */
 const WANDER_CHANCE = 0.1;
 
 // 목표 칸의 점수. 가는 데 1초 걸리는 거리가 1점을 깎는다
@@ -62,6 +63,8 @@ const BLOCK_SCORE = 2;
 const ENEMY_SCORE = 5;
 /** 적에게 가까울수록 조금씩 더 준다. 할 일이 없으면 적을 쫓아가게 된다 */
 const HUNT_SCORE = 2;
+/** 유령에게 가까울수록 깎는다. 유령이 닿으면 대신 유령이 되므로 멀리 떨어지려 한다 */
+const GHOST_SCORE = 4;
 /** 지금 노리는 칸에 더 주는 점수. 비슷한 칸 사이를 오락가락하지 않게 한다 */
 const STICKY_SCORE = 1;
 /** 불탈 칸에서 벗어날 때는 거리를 이만큼 더 무겁게 따져 가까운 칸으로 피한다 */
@@ -118,7 +121,7 @@ export function updateBot(game: Game, bot: Bot): void {
   // 길에서 벗어나면 기다리지 않고 바로 다시 판단한다
   if (game.tick >= bot.nextThinkTick || !bot.path.includes(getPlayerTile(player))) {
     bot.nextThinkTick = game.tick + THINK_INTERVAL;
-    if (player.ghost) wander(game, bot, player);
+    if (player.ghost) haunt(game, bot, player);
     else think(game, bot, player);
   }
   steer(game, bot, player);
@@ -206,6 +209,7 @@ function choosePath(
 ): number[] | null {
   const now = game.tick + 1;
   const distanceWeight = isBurning(danger, getPlayerTile(player), now) ? ESCAPE_DISTANCE_WEIGHT : 1;
+  const ghosts = game.players.filter((v) => v.ghost).map((v) => getPlayerTile(v));
   const goal = bot.path.at(-1);
   let best = -1;
   let bestScore = -Infinity;
@@ -213,7 +217,7 @@ function choosePath(
   reach.arrivals.forEach((arrival, i) => {
     if (arrival === Infinity || isBurning(danger, i, Math.max(arrival - reach.span, now))) return;
     let score =
-      scoreTile(game, bot, player, danger, i, enemies) -
+      scoreTile(game, bot, player, danger, i, enemies, ghosts) -
       ((arrival - game.tick) / TICK_RATE) * distanceWeight;
     if (i === goal) score += STICKY_SCORE;
     if (score > bestScore) {
@@ -248,6 +252,7 @@ function scoreTile(
   danger: Danger,
   index: number,
   enemies: ReadonlySet<number>,
+  ghosts: readonly number[],
 ): number {
   let score = 0;
   const item = getItemOfTile(game.tiles[index] ?? "");
@@ -264,7 +269,9 @@ function scoreTile(
 
   let nearest = Infinity;
   for (const v of enemies) nearest = Math.min(nearest, getDistance(index, v));
-  return score + HUNT_SCORE / (1 + nearest);
+  let nearestGhost = Infinity;
+  for (const v of ghosts) nearestGhost = Math.min(nearestGhost, getDistance(index, v));
+  return score + HUNT_SCORE / (1 + nearest) - GHOST_SCORE / (1 + nearestGhost);
 }
 
 /**
@@ -298,7 +305,24 @@ function countBlastTargets(
   return { blocks, hits };
 }
 
-/** 유령은 할 수 있는 일이 없으므로 이따금 아무 데나 돌아다닌다 */
+/**
+ * 유령은 산 플레이어에게 닿으면 되살아나므로 가장 빨리 닿을 수 있는 플레이어를 쫓는다.
+ * 폭풍에 맞으면 기절하므로 불탈 칸은 피해 간다. 쫓을 수 있는 플레이어가 없으면 돌아다닌다
+ */
+function haunt(game: Game, bot: Bot, player: GamePlayer): void {
+  const reach = explore(game, player, getDanger(game));
+  let goal = -1;
+  for (const v of game.players) {
+    // 갓 되살아난 플레이어에게는 닿아도 소용없다
+    if (v.ghost || isImmune(game, v)) continue;
+    const tile = getPlayerTile(v);
+    if ((reach.arrivals[tile] ?? Infinity) < (reach.arrivals[goal] ?? Infinity)) goal = tile;
+  }
+  if (goal < 0) wander(game, bot, player);
+  else bot.path = tracePath(reach, goal);
+}
+
+/** 쫓을 플레이어가 없는 유령은 이따금 아무 데나 돌아다닌다 */
 function wander(game: Game, bot: Bot, player: GamePlayer): void {
   const here = getPlayerTile(player);
   if (bot.path.length > 1 && bot.path.includes(here)) return;

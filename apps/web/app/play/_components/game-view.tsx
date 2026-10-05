@@ -31,8 +31,14 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import lPlay from "@/i18n/l.play";
-import { type GameFrame, type GameSample, sampleGame } from "./game-buffer";
-import { BOARD_HEIGHT, BOARD_WIDTH, renderGame } from "./game-renderer";
+import { type GameFrame, type GameSample, getFramesBetween, sampleGame } from "./game-buffer";
+import {
+  BOARD_HEIGHT,
+  BOARD_WIDTH,
+  createDropAnimation,
+  type DropAnimation,
+  renderGame,
+} from "./game-renderer";
 import { send, usePlayStore } from "./play-store";
 import { RoomHeader } from "./room-view";
 import { playSound } from "./sound";
@@ -95,6 +101,7 @@ const GameBoard = ({ game }: { game: GameInfo }) => {
       players: new Map(game.players.map((v) => [v.userId, v])),
       myId,
       now: 0,
+      drops: [] as DropAnimation[],
     };
     // 첫 스냅숏이 오기 전에는 처음 타일만 그린다
     const initial: GameSample["from"] = {
@@ -124,7 +131,14 @@ const GameBoard = ({ game }: { game: GameInfo }) => {
       const sample = sampleGame(now);
       // 효과음은 서버에서 받은 때가 아니라 화면에 그려지는 때에 맞춰 낸다
       if (sample) {
-        if (lastFrame && sample.from !== lastFrame) playFrameSounds(lastFrame, sample.from, myId);
+        if (lastFrame && sample.from !== lastFrame) {
+          playFrameSounds(lastFrame, sample.from, myId);
+          options.drops = updateDropAnimations(
+            options.drops,
+            getFramesBetween(lastFrame, sample.from),
+            now,
+          );
+        }
         lastFrame = sample.from;
         playFlameSounds(
           sample.from.explosions,
@@ -153,6 +167,21 @@ const GameBoard = ({ game }: { game: GameInfo }) => {
     />
   );
 };
+
+/** 끝난 애니메이션은 버리고, 새로 그리게 된 스냅숏들에서 떨어뜨린 아이템의 애니메이션을 지금 시작한다 */
+function updateDropAnimations(
+  current: DropAnimation[],
+  frames: GameFrame[],
+  now: number,
+): DropAnimation[] {
+  const next = current.filter((v) => now < v.startedAt + v.durationMs);
+  for (const frame of frames) {
+    frame.drops?.forEach((v, i) => {
+      next.push(createDropAnimation(v, now, i));
+    });
+  }
+  return next;
+}
 
 /** 앞서 그린 프레임과 비교해 새로 일어난 일의 효과음을 낸다 */
 function playFrameSounds(prev: GameFrame, next: GameFrame, myId: UserId | null): void {
