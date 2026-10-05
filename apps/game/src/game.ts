@@ -72,7 +72,7 @@ export type GamePlayer = {
   ghostAtTick: number | null;
   /** 폭풍에 맞은 유령은 이 틱까지 기절해 움직이지 못한다 */
   stunnedUntilTick: number;
-  /** 되살아난 플레이어는 이 틱까지 유령이 닿아도 유령이 되지 않는다 */
+  /** 되살아난 플레이어는 이 틱까지 유령이 닿거나 폭풍에 맞아도 유령이 되지 않는다 */
   immuneUntilTick: number;
   power: number;
   speed: number;
@@ -255,7 +255,7 @@ function isStunned(game: Game, player: GamePlayer): boolean {
   return player.ghost && game.tick < player.stunnedUntilTick;
 }
 
-/** 갓 되살아나 다음 틱에 유령이 닿아도 유령이 되지 않는지 */
+/** 갓 되살아나 다음 틱에 유령이 닿거나 폭풍에 맞아도 유령이 되지 않는지 */
 export function isImmune(game: Game, player: GamePlayer): boolean {
   return !player.ghost && game.tick < player.immuneUntilTick;
 }
@@ -518,6 +518,8 @@ function updateExplosions(game: Game): Set<number> {
 
   for (const v of game.players) {
     if (!burning.has(getTileIndex(Math.round(v.x), Math.round(v.y)))) continue;
+    // 갓 되살아난 플레이어는 폭풍에 맞지 않는다. 판정 시점은 `reviveGhosts`와 맞춘다
+    if (!v.ghost && game.tick <= v.immuneUntilTick) continue;
     if (!v.ghost) {
       v.ghost = true;
       v.ghostAtTick = game.tick;
@@ -665,7 +667,7 @@ function dropItems(game: Game, player: GamePlayer): void {
 
 /**
  * 유령이 산 플레이어에게 닿으면 그 플레이어가 유령이 되고 유령은 그 자리에서 되살아난다.
- * 기절한 유령은 되살아나지 못하고, 갓 되살아난 플레이어에게는 잠시 유령이 닿아도 소용없다
+ * 기절한 유령은 되살아나지 못하고, 갓 되살아난 플레이어에게는 잠시 유령이 닿아도 소용없다(폭풍도 마찬가지다)
  */
 function reviveGhosts(game: Game): void {
   // 이번에 닿아서 유령이 된 플레이어는 다음 틱부터 따진다

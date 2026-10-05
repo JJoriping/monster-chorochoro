@@ -5,8 +5,8 @@ import {
   CHARACTER_IDS,
   CHARACTERS,
   CHAT_MAX_LENGTH,
+  getMapCapacity,
   MAP_IDS,
-  MAX_PLAYERS_PER_ROOM,
   type MapId,
   type RoomDetail,
   type RoomPlayer,
@@ -89,7 +89,9 @@ export const RoomHeader = ({ room, children }: { room: RoomDetail; children?: Re
 const PlayerList = ({ room, isHost }: { room: RoomDetail; isHost: boolean }) => {
   const myId = usePlayStore((s) => s.myId);
   const l = lexicon(lPlay);
-  const emptySlots = MAX_PLAYERS_PER_ROOM - room.players.length;
+  const capacity = getMapCapacity(room.mapId);
+  // 인원보다 시작 위치가 적은 맵을 고르면 빈 자리 없이 정원을 넘긴 인원이 그대로 보인다
+  const emptySlots = Math.max(capacity - room.players.length, 0);
 
   return (
     <Panel
@@ -107,8 +109,13 @@ const PlayerList = ({ room, isHost }: { room: RoomDetail; isHost: boolean }) => 
               {l("addBot")}
             </Button>
           )}
-          <span c="text-b3 font-bold tabular-nums text-blue">
-            {room.players.length}/{MAX_PLAYERS_PER_ROOM}
+          <span
+            c={[
+              "text-b3 font-bold tabular-nums text-blue",
+              room.players.length > capacity && "text-red",
+            ]}
+          >
+            {room.players.length}/{capacity}
           </span>
         </>
       }
@@ -279,6 +286,10 @@ const MapSelect = ({ room, isHost }: { room: RoomDetail; isHost: boolean }) => {
             <div c="flex flex-col items-center gap-1.5 px-2">
               <MapTile mapId={v} c="w-32" />
               <span c="text-b2 font-bold">{l("mapName", v)}</span>
+              <span c="inline-flex items-center gap-1 text-b5 text-gray+1">
+                <Users size={12} />
+                {l("mapCapacity", getMapCapacity(v))}
+              </span>
             </div>
           )}
         />
@@ -345,18 +356,24 @@ const ReadyAction = ({
 
   if (isHost) {
     const allReady = room.players.every((v) => v.userId === room.hostId || v.ready);
+    const capacity = getMapCapacity(room.mapId);
+    const overCapacity = room.players.length > capacity;
 
     return (
       <div c="flex flex-col gap-2 lg:mt-auto">
         <Button
           variant="success"
-          disabled={!allReady}
+          disabled={!allReady || overCapacity}
           onClick={() => send({ type: "startGame" })}
           c="py-3 text-b1"
         >
           {l("startGame")}
         </Button>
-        {!allReady && <p c="text-center text-b5 text-gray+2">{l("waitingForReady")}</p>}
+        {overCapacity ? (
+          <p c="text-center text-b5 text-red">{l("tooManyPlayers", capacity)}</p>
+        ) : (
+          !allReady && <p c="text-center text-b5 text-gray+2">{l("waitingForReady")}</p>
+        )}
       </div>
     );
   }

@@ -2,7 +2,7 @@
 
 import { lexicon } from "@daldalso/i18n";
 import {
-  MAX_PLAYERS_PER_ROOM,
+  getMapCapacity,
   NICKNAME_MAX_LENGTH,
   ROOM_TITLE_MAX_LENGTH,
   type RoomSummary,
@@ -78,7 +78,8 @@ const RoomList = () => {
 
 const RoomItem = ({ room, onJoin }: { room: RoomSummary; onJoin: () => void }) => {
   const l = lexicon(lPlay);
-  const full = room.playerCount >= MAX_PLAYERS_PER_ROOM;
+  const capacity = getMapCapacity(room.mapId);
+  const full = room.playerCount >= capacity;
   const playing = room.status === "playing";
 
   return (
@@ -99,7 +100,7 @@ const RoomItem = ({ room, onJoin }: { room: RoomSummary; onJoin: () => void }) =
         <span c="min-w-0 flex-1 truncate text-b2 font-bold">{room.title}</span>
         <MapBadge mapId={room.mapId} />
         <span c="w-10 shrink-0 text-right text-b3 tabular-nums text-gray+2">
-          {room.playerCount}/{MAX_PLAYERS_PER_ROOM}
+          {room.playerCount}/{capacity}
         </span>
         <span
           c={[

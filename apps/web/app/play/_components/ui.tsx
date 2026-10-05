@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Factory,
+  Flame,
   House,
   type LucideIcon,
   Snowflake,
@@ -140,6 +141,7 @@ const MAP_THEME_ICONS: Record<MapTheme, LucideIcon> = {
   village: House,
   factory: Factory,
   ice: Snowflake,
+  volcano: Flame,
 };
 
 const MAP_THEME_CLASSES: Record<MapTheme, string> = {
@@ -148,6 +150,7 @@ const MAP_THEME_CLASSES: Record<MapTheme, string> = {
   village: "bg-orange-4 text-orange+2",
   factory: "bg-gray-4 text-gray+2",
   ice: "bg-cyan-4 text-cyan+2",
+  volcano: "bg-red-4 text-red+2",
 };
 
 export const MapBadge = ({ mapId }: { mapId: MapId }) => {

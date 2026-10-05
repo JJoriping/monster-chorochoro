@@ -15,10 +15,17 @@ const CHARACTER_NAMES: Record<CharacterId, string> = {
 };
 const MAP_NAMES: Record<MapId, string> = {
   "forest-1": "Forest-1",
+  "forest-2": "Forest-2",
   "sea-1": "Sea-1",
+  "sea-2": "Sea-2",
   "village-1": "Village-1",
+  "village-2": "Village-2",
   "factory-1": "Factory-1",
+  "factory-2": "Factory-2",
   "ice-1": "Ice-1",
+  "ice-2": "Ice-2",
+  "volcano-1": "Volcano-1",
+  "volcano-2": "Volcano-2",
 };
 const ERRORS: Record<ErrorCode, string> = {
   invalidNickname: `Nicknames must be 1–${NICKNAME_MAX_LENGTH} characters long.`,
@@ -31,6 +38,7 @@ const ERRORS: Record<ErrorCode, string> = {
   roomPlaying: "The game in this room has already started.",
   notHost: "Only the host can do that.",
   notAllReady: "Some players are not ready yet.",
+  tooManyPlayers: "There are too many players for this map.",
 };
 const RESULT_REASONS: Record<GameResult["reason"], string> = {
   timeout: "Time's up",
@@ -74,6 +82,7 @@ export default I18n.register({
   character: "Character",
   map: "Map",
   mapHostOnly: "Only the host can change the map.",
+  mapCapacity: (capacity: number) => `Up to ${capacity} players`,
   mapPreview: "Map preview",
   mapPreviewLabel: (id: MapId) => `Layout of ${MAP_NAMES[id]}`,
   spawnPoint: "Start position",
@@ -86,6 +95,7 @@ export default I18n.register({
   cancelReady: "Cancel ready",
   startGame: "Start game",
   waitingForReady: "You can start once every player is ready.",
+  tooManyPlayers: (capacity: number) => `This map allows up to ${capacity} players.`,
   chat: "Chat",
   chatPlaceholder: "Type a message",
   sendChat: "Send",

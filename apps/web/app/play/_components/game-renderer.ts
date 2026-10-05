@@ -73,6 +73,7 @@ const FLOOR_COLORS: Record<MapTheme, [string, string]> = {
   village: [color("gray-5"), color("orange-5")],
   factory: [color("gray-4"), color("gray-5")],
   ice: [color("cyan-5"), color("cyan-4")],
+  volcano: [color("red-5"), color("brown-4")],
 };
 
 const INK = color("gray+4");
@@ -274,6 +275,23 @@ function drawWall(ctx: CanvasRenderingContext2D, theme: MapTheme, left: number, 
       ctx.closePath();
       ctx.fill();
       break;
+    case "volcano":
+      // 용암. 바다의 물처럼 칸을 가득 채워 이웃한 칸끼리 이어 보이게 한다
+      ctx.fillStyle = color("red+1");
+      ctx.fillRect(left, top, TILE_SIZE, TILE_SIZE);
+      ctx.fillStyle = color("orange");
+      ctx.beginPath();
+      ctx.ellipse(left + 13, top + 13, 8, 5, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(left + 27, top + 28, 9, 5, 0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = color("yellow-2");
+      circle(ctx, left + 12, top + 12, 2.5);
+      ctx.fill();
+      circle(ctx, left + 29, top + 27, 3);
+      ctx.fill();
+      break;
   }
 }
 
@@ -357,6 +375,33 @@ function drawBlock(
       ctx.ellipse(left + 20, top + 15, 10, 8, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.fill();
+      break;
+    case "volcano":
+      // 구멍이 숭숭 난 화산석
+      ctx.fillStyle = color("gray+2");
+      ctx.strokeStyle = color("gray+4");
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(left + 5, top + 30);
+      ctx.lineTo(left + 8, top + 13);
+      ctx.lineTo(left + 18, top + 5);
+      ctx.lineTo(left + 31, top + 9);
+      ctx.lineTo(left + 36, top + 24);
+      ctx.lineTo(left + 30, top + 35);
+      ctx.lineTo(left + 12, top + 36);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = color("gray+4");
+      for (const [x, y, radius] of [
+        [15, 17, 2.5],
+        [25, 14, 2],
+        [27, 26, 3],
+        [15, 28, 2],
+      ] as const) {
+        circle(ctx, left + x, top + y, radius);
+        ctx.fill();
+      }
       break;
   }
 }

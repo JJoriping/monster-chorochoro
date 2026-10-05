@@ -15,10 +15,17 @@ const CHARACTER_NAMES: Record<CharacterId, string> = {
 };
 const MAP_NAMES: Record<MapId, string> = {
   "forest-1": "숲-1",
+  "forest-2": "숲-2",
   "sea-1": "바다-1",
+  "sea-2": "바다-2",
   "village-1": "마을-1",
+  "village-2": "마을-2",
   "factory-1": "공장-1",
+  "factory-2": "공장-2",
   "ice-1": "얼음-1",
+  "ice-2": "얼음-2",
+  "volcano-1": "화산-1",
+  "volcano-2": "화산-2",
 };
 const ERRORS: Record<ErrorCode, string> = {
   invalidNickname: `닉네임은 1~${NICKNAME_MAX_LENGTH}자로 정해 주세요.`,
@@ -31,6 +38,7 @@ const ERRORS: Record<ErrorCode, string> = {
   roomPlaying: "이미 게임이 시작된 방입니다.",
   notHost: "방장만 할 수 있습니다.",
   notAllReady: "아직 준비하지 않은 플레이어가 있습니다.",
+  tooManyPlayers: "이 맵에서 함께 플레이하기에는 인원이 너무 많습니다.",
 };
 const RESULT_REASONS: Record<GameResult["reason"], string> = {
   timeout: "시간 종료",
@@ -74,6 +82,7 @@ export default I18n.register({
   character: "캐릭터",
   map: "맵",
   mapHostOnly: "방장만 맵을 바꿀 수 있습니다.",
+  mapCapacity: (capacity: number) => `최대 ${capacity}명`,
   mapPreview: "맵 미리보기",
   mapPreviewLabel: (id: MapId) => `${MAP_NAMES[id]} 맵의 배치`,
   spawnPoint: "시작 위치",
@@ -86,6 +95,7 @@ export default I18n.register({
   cancelReady: "준비 취소",
   startGame: "게임 시작",
   waitingForReady: "모든 플레이어가 준비하면 시작할 수 있습니다.",
+  tooManyPlayers: (capacity: number) => `이 맵은 ${capacity}명까지만 플레이할 수 있습니다.`,
   chat: "채팅",
   chatPlaceholder: "메시지를 입력하세요",
   sendChat: "전송",

@@ -11,7 +11,7 @@ import {
   GAME_DURATION_MS,
   GAME_RESULT_MS,
   type GameInfo,
-  MAX_PLAYERS_PER_ROOM,
+  getMapCapacity,
   type MapId,
   NICKNAME_MAX_LENGTH,
   ROOM_TITLE_MAX_LENGTH,
@@ -160,7 +160,7 @@ function joinRoom(user: User, roomId: RoomId): ErrorCode | undefined {
   const room = rooms.get(roomId);
   if (!room) return "roomNotFound";
   if (room.status !== "waiting") return "roomPlaying";
-  if (room.players.length >= MAX_PLAYERS_PER_ROOM) return "roomFull";
+  if (room.players.length >= getMapCapacity(room.mapId)) return "roomFull";
 
   enterRoom(user, room);
 }
@@ -219,6 +219,7 @@ function selectMap(user: User, mapId: MapId): ErrorCode | undefined {
   if (room.status !== "waiting") return "roomPlaying";
   if (room.hostId !== user.id) return "notHost";
 
+  // 지금 인원보다 시작 위치가 적은 맵도 고를 수는 있다. 인원이 줄기 전까지는 게임을 시작할 수 없다
   room.mapId = mapId;
   broadcastRoom(room);
   broadcastLobby();
@@ -243,6 +244,7 @@ function startGame(user: User): ErrorCode | undefined {
   if (room.status !== "waiting") return "roomPlaying";
   if (room.hostId !== user.id) return "notHost";
   if (room.players.some((v) => v.userId !== room.hostId && !v.ready)) return "notAllReady";
+  if (room.players.length > getMapCapacity(room.mapId)) return "tooManyPlayers";
 
   const game = createGame(room.mapId, room.players);
   room.status = "playing";
@@ -292,7 +294,7 @@ function addBot(user: User): ErrorCode | undefined {
   if (!room) return "notInRoom";
   if (room.status !== "waiting") return "roomPlaying";
   if (room.hostId !== user.id) return "notHost";
-  if (room.players.length >= MAX_PLAYERS_PER_ROOM) return "roomFull";
+  if (room.players.length >= getMapCapacity(room.mapId)) return "roomFull";
 
   room.players.push({
     userId: nextUserId++,

@@ -83,7 +83,7 @@ export type GamePlayerState = {
   ghost: boolean;
   /** 유령이 폭풍에 맞아 기절해 움직이지 못하는지 */
   stunned: boolean;
-  /** 되살아난 지 얼마 안 되어 유령이 닿아도 유령이 되지 않는지 */
+  /** 되살아난 지 얼마 안 되어 유령이 닿거나 폭풍에 맞아도 유령이 되지 않는지 */
   immune: boolean;
   /** 아이템으로 올린 능력치 */
   power: number;
@@ -157,7 +157,9 @@ export type ErrorCode =
   | "roomFull"
   | "roomPlaying"
   | "notHost"
-  | "notAllReady";
+  | "notAllReady"
+  /** 고른 맵의 시작 위치보다 플레이어가 많다 */
+  | "tooManyPlayers";
 
 /** 클라이언트 → 서버 */
 export type ClientMessage =
