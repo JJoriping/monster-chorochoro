@@ -1,5 +1,6 @@
 import {
   type ClientMessage,
+  isBotDifficulty,
   isCharacterId,
   isDirection,
   isMapId,
@@ -37,6 +38,12 @@ export function parseClientMessage(data: string): ClientMessage | null {
     case "removeBot":
       return typeof message.userId === "number" && Number.isInteger(message.userId)
         ? { type: message.type, userId: message.userId }
+        : null;
+    case "setBotDifficulty":
+      return typeof message.userId === "number" &&
+        Number.isInteger(message.userId) &&
+        isBotDifficulty(message.difficulty)
+        ? { type: message.type, userId: message.userId, difficulty: message.difficulty }
         : null;
     case "move":
       return message.direction === null || isDirection(message.direction)

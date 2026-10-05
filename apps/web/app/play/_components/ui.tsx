@@ -2,7 +2,14 @@
 
 import { lexicon } from "@daldalso/i18n";
 import type c from "@daldalso/tailwind-base";
-import { type CharacterId, MAPS, type MapId, type MapTheme } from "@monster-chorochoro/common";
+import {
+  BOT_DIFFICULTIES,
+  type BotDifficulty,
+  type CharacterId,
+  MAPS,
+  type MapId,
+  type MapTheme,
+} from "@monster-chorochoro/common";
 import {
   Bot,
   ChevronLeft,
@@ -132,6 +139,76 @@ export const BotBadge = () => {
       <Bot size={10} />
       {l("bot")}
     </span>
+  );
+};
+
+const BOT_DIFFICULTY_CLASSES: Record<BotDifficulty, string> = {
+  easy: "bg-green-4 text-green+2",
+  normal: "bg-orange-4 text-orange+2",
+  hard: "bg-red-4 text-red+2",
+};
+
+/** 매울수록 불꽃이 하나씩 늘어난다 */
+const BotDifficultyFlames = ({ difficulty }: { difficulty: BotDifficulty }) => {
+  return (
+    <span aria-hidden="true" c="flex -space-x-0.5">
+      {BOT_DIFFICULTIES.slice(0, BOT_DIFFICULTIES.indexOf(difficulty) + 1).map((v) => (
+        <Flame key={v} size={10} />
+      ))}
+    </span>
+  );
+};
+
+export const BotDifficultyBadge = ({ difficulty }: { difficulty: BotDifficulty }) => {
+  const l = lexicon(lPlay);
+
+  return (
+    <span
+      c={[
+        "inline-flex items-center gap-1 rounded-full px-2 text-b4 font-bold",
+        BOT_DIFFICULTY_CLASSES[difficulty],
+      ]}
+    >
+      <BotDifficultyFlames difficulty={difficulty} />
+      {l("botDifficulty", difficulty)}
+    </span>
+  );
+};
+
+/** 난이도를 고르는 버튼 묶음. 고른 난이도는 그 색으로 칠한다 */
+export const BotDifficultySelect = ({
+  value,
+  onChange,
+  label,
+}: {
+  value: BotDifficulty;
+  onChange: (value: BotDifficulty) => void;
+  label: string;
+}) => {
+  const l = lexicon(lPlay);
+
+  return (
+    <fieldset aria-label={label} c="flex rounded-full bg-gray-5 p-0.5">
+      {BOT_DIFFICULTIES.map((v) => (
+        <button
+          key={v}
+          type="button"
+          aria-pressed={v === value}
+          onClick={() => {
+            if (v === value) return;
+            playSound("ui-click");
+            onChange(v);
+          }}
+          c={[
+            "inline-flex items-center gap-0.5 whitespace-nowrap rounded-full px-1.5 text-b5 font-bold text-gray transition-colors",
+            v === value ? BOT_DIFFICULTY_CLASSES[v] : "hover:text-gray+3",
+          ]}
+        >
+          {v === value && <BotDifficultyFlames difficulty={v} />}
+          {l("botDifficulty", v)}
+        </button>
+      ))}
+    </fieldset>
   );
 };
 

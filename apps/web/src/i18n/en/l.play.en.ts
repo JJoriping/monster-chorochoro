@@ -1,5 +1,6 @@
 import I18n from "@daldalso/i18n";
 import {
+  type BotDifficulty,
   type CharacterId,
   type ErrorCode,
   type GameResult,
@@ -12,6 +13,11 @@ const CHARACTER_NAMES: Record<CharacterId, string> = {
   moremi: "Moremi",
   pazna: "Pazna",
   levisi: "Levisi",
+};
+const BOT_DIFFICULTY_NAMES: Record<BotDifficulty, string> = {
+  easy: "Mild",
+  normal: "Medium",
+  hard: "Hot",
 };
 const MAP_NAMES: Record<MapId, string> = {
   "forest-1": "Forest-1",
@@ -75,6 +81,8 @@ export default I18n.register({
   emptySlot: "Empty",
   addBot: "Invite AI",
   removeBot: (nickname: string) => `Remove ${nickname}`,
+  botDifficulty: (difficulty: BotDifficulty) => BOT_DIFFICULTY_NAMES[difficulty],
+  botDifficultyGroup: (nickname: string) => `Difficulty of ${nickname}`,
   host: "Host",
   ready: "Ready",
   notReady: "Not ready",

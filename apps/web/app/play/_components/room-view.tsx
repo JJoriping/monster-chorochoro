@@ -2,6 +2,7 @@
 
 import { lexicon } from "@daldalso/i18n";
 import {
+  type BotDifficulty,
   CHARACTER_IDS,
   CHARACTERS,
   CHAT_MAX_LENGTH,
@@ -32,6 +33,8 @@ import { send, usePlayStore } from "./play-store";
 import { playSound } from "./sound";
 import {
   BotBadge,
+  BotDifficultyBadge,
+  BotDifficultySelect,
   Button,
   Carousel,
   CharacterAvatar,
@@ -127,9 +130,14 @@ const PlayerList = ({ room, isHost }: { room: RoomDetail; isHost: boolean }) => 
             player={v}
             isHost={v.userId === room.hostId}
             isMe={v.userId === myId}
-            // 방장만 AI를 내보낼 수 있다
+            // 방장만 AI를 내보내거나 난이도를 바꿀 수 있다
             onRemove={
               isHost && v.bot ? () => send({ type: "removeBot", userId: v.userId }) : undefined
+            }
+            onDifficultyChange={
+              isHost && v.bot
+                ? (difficulty) => send({ type: "setBotDifficulty", userId: v.userId, difficulty })
+                : undefined
             }
           />
         ))}
@@ -152,12 +160,15 @@ const PlayerSlot = ({
   isHost,
   isMe,
   onRemove,
+  onDifficultyChange,
 }: {
   player: RoomPlayer;
   isHost: boolean;
   isMe: boolean;
   /** 주어지면 자리 구석에 내보내기 버튼을 보인다 */
   onRemove?: () => void;
+  /** 주어지면 AI의 난이도를 고를 수 있게 한다 */
+  onDifficultyChange?: (difficulty: BotDifficulty) => void;
 }) => {
   const l = lexicon(lPlay);
 
@@ -194,6 +205,17 @@ const PlayerSlot = ({
           <Crown size={12} />
           {l("host")}
         </span>
+      ) : player.difficulty ? (
+        // AI는 늘 준비되어 있으므로 준비 상태 대신 난이도를 보인다
+        onDifficultyChange ? (
+          <BotDifficultySelect
+            value={player.difficulty}
+            onChange={onDifficultyChange}
+            label={l("botDifficultyGroup", player.nickname)}
+          />
+        ) : (
+          <BotDifficultyBadge difficulty={player.difficulty} />
+        )
       ) : player.ready ? (
         <span c="inline-flex items-center gap-1 rounded-full bg-green-4 px-2 text-b4 font-bold text-green+2">
           <Check size={12} />

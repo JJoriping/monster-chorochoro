@@ -1,5 +1,6 @@
 import I18n from "@daldalso/i18n";
 import {
+  type BotDifficulty,
   type CharacterId,
   type ErrorCode,
   type GameResult,
@@ -12,6 +13,11 @@ const CHARACTER_NAMES: Record<CharacterId, string> = {
   moremi: "모레미",
   pazna: "파즈나",
   levisi: "레비시",
+};
+const BOT_DIFFICULTY_NAMES: Record<BotDifficulty, string> = {
+  easy: "순한맛",
+  normal: "중간맛",
+  hard: "매운맛",
 };
 const MAP_NAMES: Record<MapId, string> = {
   "forest-1": "숲-1",
@@ -75,6 +81,8 @@ export default I18n.register({
   emptySlot: "빈 자리",
   addBot: "AI 초대",
   removeBot: (nickname: string) => `${nickname} 내보내기`,
+  botDifficulty: (difficulty: BotDifficulty) => BOT_DIFFICULTY_NAMES[difficulty],
+  botDifficultyGroup: (nickname: string) => `${nickname}의 난이도`,
   host: "방장",
   ready: "준비 완료",
   notReady: "준비 중",

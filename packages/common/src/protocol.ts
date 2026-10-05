@@ -8,6 +8,17 @@ export type RoomId = number;
 /** 대기 중인 방만 입장할 수 있다 */
 export type RoomStatus = "waiting" | "playing";
 
+/** AI의 난이도. 순한맛, 중간맛, 매운맛 순이다 */
+export const BOT_DIFFICULTIES = ["easy", "normal", "hard"] as const;
+export type BotDifficulty = (typeof BOT_DIFFICULTIES)[number];
+
+/** 새로 초대한 AI의 난이도 */
+export const DEFAULT_BOT_DIFFICULTY: BotDifficulty = "normal";
+
+export function isBotDifficulty(value: unknown): value is BotDifficulty {
+  return BOT_DIFFICULTIES.includes(value as BotDifficulty);
+}
+
 /** 로비의 접속자 목록에 보이는 사용자 정보 */
 export type UserSummary = {
   id: UserId;
@@ -33,6 +44,8 @@ export type RoomPlayer = {
   ready: boolean;
   /** 방장이 초대한 AI 플레이어인지. AI는 늘 준비되어 있다 */
   bot: boolean;
+  /** AI의 난이도. 사람이면 null */
+  difficulty: BotDifficulty | null;
 };
 
 /** 방 안의 플레이어에게 보이는 방 정보 */
@@ -176,6 +189,8 @@ export type ClientMessage =
   /** 방장만 할 수 있다. AI는 빈 자리를 하나 차지한다 */
   | { type: "addBot" }
   | { type: "removeBot"; userId: UserId }
+  /** 방장만 할 수 있다 */
+  | { type: "setBotDifficulty"; userId: UserId; difficulty: BotDifficulty }
   | { type: "chat"; text: string }
   /** 누르고 있는 방향이 바뀔 때마다 보낸다. 손을 떼면 null */
   | { type: "move"; direction: Direction | null }

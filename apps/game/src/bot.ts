@@ -1,4 +1,5 @@
 import {
+  type BotDifficulty,
   CHARACTERS,
   DIRECTION_VECTORS,
   DIRECTIONS,
@@ -32,8 +33,51 @@ import {
   setPlayerInput,
 } from "./game";
 
-/** AI가 상황을 다시 살피는 간격 (틱). 사람처럼 조금 늦게 반응하게 한다 */
-const THINK_INTERVAL = 4;
+type BotProfile = {
+  /** 상황을 다시 살피는 간격 (틱). 길수록 위험을 늦게 알아차린다 */
+  thinkInterval: number;
+  /** 적을 노리고 쫓는 점수에 곱하는 값 */
+  aggression: number;
+  /** 판단할 때마다 꾸루를 놓을 만한 자리인지 살펴볼 확률. 낮을수록 머뭇거린다 */
+  placeChance: number;
+  /** 아직 일어나지 않은 폭풍을 칸마다 통째로 못 보고 지나칠 확률 */
+  oversight: number;
+  /** 아직 일어나지 않은 폭풍이 닿는 때는 늦게, 사라지는 때는 이르게 어림하는 최대 오차 (틱) */
+  timingError: number;
+  /** 누르던 방향키를 떼거나 바꿀 때 늦어지는 최대 시간 (틱). 한가운데를 지나치거나 모퉁이에서 엇나간다 */
+  releaseDelay: number;
+};
+
+const BOT_PROFILES: Record<BotDifficulty, BotProfile> = {
+  // 느긋하게 반응하고 적보다는 블록과 아이템에 마음을 쓴다.
+  // 폭풍이 어디에 언제 닿을지 자주 잘못 어림해 스스로 뛰어들기도 한다
+  easy: {
+    thinkInterval: 12,
+    aggression: 0.4,
+    placeChance: 0.4,
+    oversight: 0.03,
+    timingError: 7,
+    releaseDelay: 5,
+  },
+  // 사람처럼 조금 늦게 반응하고 가끔 아슬아슬하게 어림한다
+  normal: {
+    thinkInterval: 8,
+    aggression: 1,
+    placeChance: 0.7,
+    oversight: 0.01,
+    timingError: 2,
+    releaseDelay: 2,
+  },
+  // 재빠르게 반응하고 적을 끈질기게 몰아붙이며 폭풍을 정확히 내다본다
+  hard: {
+    thinkInterval: 4,
+    aggression: 1.5,
+    placeChance: 1,
+    oversight: 0,
+    timingError: 0,
+    releaseDelay: 0,
+  },
+};
 
 /** 폭풍을 내다보는 길이 (틱). 갓 놓은 꾸루가 저절로 터진 폭풍이 다 사라질 때까지를 덮는다 */
 const FORECAST_TICKS = Math.ceil(
@@ -74,9 +118,14 @@ const TILE_COUNT = MAP_COLS * MAP_ROWS;
 
 export type Bot = {
   userId: UserId;
+  profile: BotProfile;
+  /** 폭풍을 잘못 어림하는 버릇을 정하는 값. AI마다 다르게 틀린다 */
+  seed: number;
   /** 따라가는 길. 지금 칸부터 목표 칸까지의 칸 번호이며, 늘 지금 칸을 담고 있어야 한다 */
   path: number[];
   nextThinkTick: number;
+  /** 누르던 방향키를 떼거나 바꾸기로 한 틱. 그때까지는 누르던 방향키를 그대로 누른다. 떼려는 키가 없으면 null */
+  releaseTick: number | null;
   /** 꾸루를 놓으려다 그만둔 칸과, 그 칸을 다시 노릴 수 있게 되는 틱 */
   cooldowns: Map<number, number>;
 };
@@ -108,9 +157,18 @@ const dangers = new WeakMap<Game, Danger>();
 const placementTicks = new WeakMap<Game, number>();
 
 /** index는 같은 게임의 AI마다 다른 번호다 */
-export function createBot(userId: UserId, index: number): Bot {
+export function createBot(userId: UserId, difficulty: BotDifficulty, index: number): Bot {
+  const profile = BOT_PROFILES[difficulty];
   // 여러 AI가 같은 틱에 몰려서 판단하지 않도록 엇갈리게 한다
-  return { userId, path: [], nextThinkTick: index % THINK_INTERVAL, cooldowns: new Map() };
+  return {
+    userId,
+    profile,
+    seed: Math.floor(Math.random() * 2 ** 32),
+    path: [],
+    nextThinkTick: index % profile.thinkInterval,
+    releaseTick: null,
+    cooldowns: new Map(),
+  };
 }
 
 /** 이번 틱의 조작을 정한다. `stepGame`을 부르기 바로 전에 부른다 */
@@ -120,7 +178,7 @@ export function updateBot(game: Game, bot: Bot): void {
 
   // 길에서 벗어나면 기다리지 않고 바로 다시 판단한다
   if (game.tick >= bot.nextThinkTick || !bot.path.includes(getPlayerTile(player))) {
-    bot.nextThinkTick = game.tick + THINK_INTERVAL;
+    bot.nextThinkTick = game.tick + bot.profile.thinkInterval;
     if (player.ghost) haunt(game, bot, player);
     else think(game, bot, player);
   }
@@ -128,12 +186,13 @@ export function updateBot(game: Game, bot: Bot): void {
 }
 
 function think(game: Game, bot: Bot, player: GamePlayer): void {
-  const danger = getDanger(game);
+  const actual = getDanger(game);
   const enemies = new Set(
     game.players.filter((v) => v !== player && !v.ghost).map((v) => getPlayerTile(v)),
   );
-  if (tryPlaceKuru(game, bot, player, danger, enemies)) return;
+  if (tryPlaceKuru(game, bot, player, actual, enemies)) return;
 
+  const danger = perceive(game, bot, actual);
   for (const margin of SAFETY_MARGINS) {
     const reach = explore(game, player, danger, margin);
     const path = choosePath(game, bot, player, danger, reach, enemies);
@@ -155,6 +214,7 @@ function tryPlaceKuru(
 ): boolean {
   const here = getPlayerTile(player);
   if (!canPlaceKuru(game, player) || isCoolingDown(game, bot, here)) return false;
+  if (Math.random() >= bot.profile.placeChance) return false;
   // 폭풍에 닿을 것이 없어 보이는 자리에서는 비싸게 내다보지 않는다
   const targets = countBlastTargets(danger.tiles, here, getBlastLength(player.power), enemies);
   if (!targets.blocks && !targets.hits) return false;
@@ -177,12 +237,16 @@ function tryPlaceKuru(
     }
     // 적은 피하겠지만 적이 선 칸을 새로 불태우면 몰아붙이는 셈이다
     for (const v of enemies) {
-      if (isBurning(next, v, now) && !isBurning(danger, v, now)) score += ENEMY_SCORE;
+      if (isBurning(next, v, now) && !isBurning(danger, v, now)) {
+        score += ENEMY_SCORE * bot.profile.aggression;
+      }
     }
     if (score <= (best?.score ?? 0)) continue;
 
-    const reach = explore(game, player, next, SAFETY_MARGINS[0]);
-    const path = choosePath(game, bot, player, next, reach, enemies);
+    // 피할 길은 이 AI가 어림한 대로 찾으므로 서툰 AI는 스스로 갇히기도 한다
+    const perceived = perceive(game, bot, next);
+    const reach = explore(game, player, perceived, SAFETY_MARGINS[0]);
+    const path = choosePath(game, bot, player, perceived, reach, enemies);
     if (path) best = { direction, score, danger: next, path };
   }
   if (!best) {
@@ -264,14 +328,16 @@ function scoreTile(
       getBlastLength(player.power),
       enemies,
     );
-    score += blocks * BLOCK_SCORE + hits * ENEMY_SCORE;
+    score += blocks * BLOCK_SCORE + hits * ENEMY_SCORE * bot.profile.aggression;
   }
 
   let nearest = Infinity;
   for (const v of enemies) nearest = Math.min(nearest, getDistance(index, v));
   let nearestGhost = Infinity;
   for (const v of ghosts) nearestGhost = Math.min(nearestGhost, getDistance(index, v));
-  return score + HUNT_SCORE / (1 + nearest) - GHOST_SCORE / (1 + nearestGhost);
+  return (
+    score + (HUNT_SCORE * bot.profile.aggression) / (1 + nearest) - GHOST_SCORE / (1 + nearestGhost)
+  );
 }
 
 /**
@@ -310,7 +376,7 @@ function countBlastTargets(
  * 폭풍에 맞으면 기절하므로 불탈 칸은 피해 간다. 쫓을 수 있는 플레이어가 없으면 돌아다닌다
  */
 function haunt(game: Game, bot: Bot, player: GamePlayer): void {
-  const reach = explore(game, player, getDanger(game));
+  const reach = explore(game, player, perceive(game, bot, getDanger(game)));
   let goal = -1;
   for (const v of game.players) {
     // 갓 되살아난 플레이어에게는 닿아도 소용없다
@@ -403,7 +469,17 @@ function steer(game: Game, bot: Bot, player: GamePlayer): void {
         ? getDirectionAlong(!horizontal, misalignment)
         : getDirectionAlong(horizontal, horizontal ? target.x - x : target.y - y);
   }
-  if (player.input !== direction) setPlayerInput(game, player.userId, direction);
+  if (player.input === direction) {
+    bot.releaseTick = null;
+    return;
+  }
+  // 손을 떼는 것은 사람처럼 조금씩 늦는다. 새로 누르는 것은 판단 간격만큼 이미 늦었으므로 바로 한다
+  if (player.input !== null) {
+    bot.releaseTick ??= game.tick + Math.round(Math.random() * bot.profile.releaseDelay);
+    if (game.tick < bot.releaseTick) return;
+  }
+  bot.releaseTick = null;
+  setPlayerInput(game, player.userId, direction);
 }
 
 function getDanger(game: Game): Danger {
@@ -437,6 +513,38 @@ function forecast(game: Game, placement?: { player: GamePlayer; direction: Direc
     placement,
   );
   return { nextEntityId: game.nextEntityId, flames, tiles };
+}
+
+/**
+ * 이 AI가 어림한 폭풍. 이미 불타고 있는 칸은 눈에 보이므로 그대로 두고, 아직 일어나지 않은 폭풍만
+ * 못 보고 지나치거나 더 짧게 어림한다. 같은 폭풍은 판단할 때마다 같게 틀리도록 시드로 정해 오락가락하지 않는다
+ */
+function perceive(game: Game, bot: Bot, danger: Danger): Danger {
+  const { oversight, timingError } = bot.profile;
+  if (!oversight && !timingError) return danger;
+
+  const flames = danger.flames.map((list, index) =>
+    list.flatMap(([start, end]): [number, number][] => {
+      if (start <= game.tick) return [[start, end]];
+      if (hash(bot.seed, index, start, 0) < oversight) return [];
+      const from = start + Math.round(hash(bot.seed, index, start, 1) * timingError);
+      const to = end - Math.round(hash(bot.seed, index, start, 2) * timingError);
+      return from < to ? [[from, to]] : [];
+    }),
+  );
+  return { ...danger, flames };
+}
+
+/** 0 이상 1 미만으로 고르게 퍼진 값. 같은 입력에는 늘 같은 값을 낸다 */
+function hash(...values: number[]): number {
+  let h = 0x9e3779b9;
+  for (const v of values) {
+    h = Math.imul(h ^ v, 0x85ebca6b);
+    h ^= h >>> 13;
+    h = Math.imul(h, 0xc2b2ae35);
+    h ^= h >>> 16;
+  }
+  return (h >>> 0) / 2 ** 32;
 }
 
 /** 칸이 [from, to) 틱 사이에 한 번이라도 불타는지 */

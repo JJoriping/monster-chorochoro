@@ -1,8 +1,10 @@
 import {
+  type BotDifficulty,
   CHARACTER_IDS,
   CHAT_MAX_LENGTH,
   type CharacterId,
   type ClientMessage,
+  DEFAULT_BOT_DIFFICULTY,
   DEFAULT_CHARACTER_ID,
   DEFAULT_MAP_ID,
   type Direction,
@@ -50,6 +52,8 @@ type Player = {
   ready: boolean;
   /** AI 플레이어의 이름. 사람이면 null */
   botName: string | null;
+  /** AI 플레이어의 난이도. 사람이면 null */
+  botDifficulty: BotDifficulty | null;
 };
 
 type Room = {
@@ -114,6 +118,8 @@ function dispatch(user: User, message: ClientMessage): ErrorCode | undefined {
       return addBot(user);
     case "removeBot":
       return removeBot(user, message.userId);
+    case "setBotDifficulty":
+      return setBotDifficulty(user, message.userId, message.difficulty);
     case "chat":
       return chat(user, message.text);
     case "move":
@@ -171,6 +177,7 @@ function enterRoom(user: User, room: Room): void {
     characterId: DEFAULT_CHARACTER_ID,
     ready: false,
     botName: null,
+    botDifficulty: null,
   });
   user.roomId = room.id;
   broadcastRoom(room);
@@ -249,7 +256,9 @@ function startGame(user: User): ErrorCode | undefined {
   const game = createGame(room.mapId, room.players);
   room.status = "playing";
   room.game = game;
-  room.bots = room.players.filter((v) => v.botName !== null).map((v, i) => createBot(v.userId, i));
+  room.bots = room.players.flatMap((v, i) =>
+    v.botDifficulty === null ? [] : [createBot(v.userId, v.botDifficulty, i)],
+  );
   sendToRoom(room, { type: "gameStart", game: toGameInfo(room, game) });
   // 카운트다운 동안에도 캐릭터가 보이도록 처음 상태를 한 번 보낸다
   sendToRoom(room, { type: "gameState", state: toSnapshot(game) });
@@ -302,6 +311,10 @@ function addBot(user: User): ErrorCode | undefined {
     // AI는 늘 준비되어 있다
     ready: true,
     botName: createBotName(room),
+    // 가장 나중에 들어온 AI의 난이도를 이어받아 같은 난이도의 AI를 여럿 부르기 쉽게 한다
+    botDifficulty:
+      room.players.filter((v) => v.botDifficulty !== null).at(-1)?.botDifficulty ??
+      DEFAULT_BOT_DIFFICULTY,
   });
   broadcastRoom(room);
   broadcastLobby();
@@ -318,6 +331,23 @@ function removeBot(user: User, userId: UserId): ErrorCode | undefined {
   room.players = room.players.filter((v) => v.userId !== userId);
   broadcastRoom(room);
   broadcastLobby();
+}
+
+function setBotDifficulty(
+  user: User,
+  userId: UserId,
+  difficulty: BotDifficulty,
+): ErrorCode | undefined {
+  const room = getRoomOf(user);
+  if (!room) return "notInRoom";
+  if (room.status !== "waiting") return "roomPlaying";
+  if (room.hostId !== user.id) return "notHost";
+  const player = getPlayer(room, userId);
+  // 이미 내보낸 AI의 난이도를 바꾸려는 것은 조용히 무시한다
+  if (!player || player.botDifficulty === null || player.botDifficulty === difficulty) return;
+
+  player.botDifficulty = difficulty;
+  broadcastRoom(room);
 }
 
 /** 방 안의 다른 AI와 겹치지 않는 가장 작은 번호로 이름을 붙인다 */
@@ -430,6 +460,7 @@ function toRoomDetail(room: Room): RoomDetail {
       characterId: v.characterId,
       ready: v.ready,
       bot: v.botName !== null,
+      difficulty: v.botDifficulty,
     })),
   };
 }
