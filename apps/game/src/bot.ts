@@ -83,7 +83,7 @@ export type Bot = {
 
 /** 앞으로 불탈 칸들 */
 type Danger = {
-  /** 내다본 뒤에 놓인 꾸루는 이 번호 이상을 가진다. 그런 꾸루가 생기면 다시 내다봐야 한다 */
+  /** 내다본 뒤에 놓인 꾸루나 서든 데스가 예고한 폭발은 이 번호 이상을 가진다. 그런 것이 생기면 다시 내다봐야 한다 */
   nextEntityId: number;
   /** 칸마다 불타는 틱 구간 [시작, 끝)들 */
   flames: [number, number][][];
@@ -408,7 +408,14 @@ function steer(game: Game, bot: Bot, player: GamePlayer): void {
 
 function getDanger(game: Game): Danger {
   const cached = dangers.get(game);
-  if (cached && !game.kurus.some((v) => v.id >= cached.nextEntityId)) return cached;
+  // 서든 데스가 예고한 폭발은 미리 내다볼 수 없으므로 새 꾸루처럼 다시 내다볼 까닭이 된다
+  if (
+    cached &&
+    !game.kurus.some((v) => v.id >= cached.nextEntityId) &&
+    !game.explosions.some((v) => v.id >= cached.nextEntityId && v.age < 0)
+  ) {
+    return cached;
+  }
   const danger = forecast(game);
   dangers.set(game, danger);
   return danger;

@@ -26,6 +26,8 @@ import {
   type MapId,
   parseMapLayout,
   REVIVE_IMMUNITY_MS,
+  SUDDEN_DEATH_INTERVAL_MS,
+  SUDDEN_DEATH_WARNING_MS,
   TICK_RATE,
   TILES,
   type UserId,
@@ -45,6 +47,9 @@ const GHOST_TOUCH_DISTANCE = 0.6;
 
 const GHOST_STUN_TICKS = Math.round((GHOST_STUN_MS * TICK_RATE) / 1000);
 const REVIVE_IMMUNITY_TICKS = Math.round((REVIVE_IMMUNITY_MS * TICK_RATE) / 1000);
+const GAME_DURATION_TICKS = Math.round((GAME_DURATION_MS * TICK_RATE) / 1000);
+const SUDDEN_DEATH_INTERVAL_TICKS = Math.round((SUDDEN_DEATH_INTERVAL_MS * TICK_RATE) / 1000);
+const SUDDEN_DEATH_WARNING_TICKS = Math.round((SUDDEN_DEATH_WARNING_MS * TICK_RATE) / 1000);
 
 const ITEM_TILES: Record<ItemType, string> = {
   power: TILES.power,
@@ -106,7 +111,7 @@ type Explosion = {
   settled: [boolean, boolean, boolean, boolean];
   /** 방향별로 폭풍의 끝 칸이 블록인지. 폭풍은 블록을 부수기만 하고 그 칸에 머무르지 않는다 */
   blocked: [boolean, boolean, boolean, boolean];
-  /** 터진 뒤로 지난 틱 수 */
+  /** 터진 뒤로 지난 틱 수. 서든 데스의 폭발은 경고 그림자만 보이는 동안 음수다 */
   age: number;
   /** 폭풍이 닿아 판정을 마친 거리. 처음에는 0 */
   spread: number;
@@ -247,6 +252,7 @@ export function stepGame(game: Game): void {
   updateKurus(game);
   updateExplosions(game);
   reviveGhosts(game);
+  warnSuddenDeath(game);
   game.result = judge(game);
 }
 
@@ -484,19 +490,44 @@ function isKuruAt(game: Game, x: number, y: number): boolean {
  */
 function explode(game: Game, kuru: Kuru): void {
   game.kurus = game.kurus.filter((v) => v !== kuru);
+  addExplosion(game, Math.round(kuru.x), Math.round(kuru.y), kuru.blastLength, 0);
+}
+
+/** age가 음수면 그만큼의 틱 동안 경고 그림자만 보이다가 터진다 */
+function addExplosion(game: Game, x: number, y: number, blastLength: number, age: number): void {
   const explosion: Explosion = {
     id: game.nextEntityId++,
-    x: Math.round(kuru.x),
-    y: Math.round(kuru.y),
-    blastLength: kuru.blastLength,
+    x,
+    y,
+    blastLength,
     arms: [0, 0, 0, 0],
     settled: [false, false, false, false],
     blocked: [false, false, false, false],
-    age: 0,
+    age,
     spread: 0,
   };
   predictArms(game, explosion);
   game.explosions.push(explosion);
+}
+
+/**
+ * 시간이 다 되면 서든 데스가 시작되어 아무 칸에나 폭발을 예고한다. 예고한 칸은 경고 그림자가 보이다가 그 칸만 터진다.
+ * 처음에는 한 칸, 다음에는 두 칸, 그다음에는 세 칸… 하는 식으로 예고할 때마다 한 칸씩 늘어난다
+ */
+function warnSuddenDeath(game: Game): void {
+  const elapsed = game.tick - GAME_DURATION_TICKS;
+  if (elapsed < 0 || elapsed % SUDDEN_DEATH_INTERVAL_TICKS) return;
+
+  const count = elapsed / SUDDEN_DEATH_INTERVAL_TICKS + 1;
+  // 벽과 블록은 뺀다. 앞서 예고한 칸도 다시 고를 수 있어서, 칸 수보다 많이 예고하게 되면 피할 곳이 없다
+  const spots = game.tiles.flatMap((_, i) => {
+    const x = i % MAP_COLS;
+    const y = (i - x) / MAP_COLS;
+    return isWalkable(game, x, y) ? [{ x, y }] : [];
+  });
+  for (const { x, y } of shuffle(spots, game.random).slice(0, count)) {
+    addExplosion(game, x, y, 0, -SUDDEN_DEATH_WARNING_TICKS);
+  }
 }
 
 /**
@@ -690,14 +721,11 @@ function reviveGhosts(game: Game): void {
 }
 
 /**
- * 시간이 다 되면 살아남은 플레이어가 모두 이긴다.
  * 혼자 남으면 그 플레이어가 이기고, 남은 플레이어가 한꺼번에 탈락하면 그 플레이어들이 함께 이긴다.
+ * 시간이 다 되어도 끝나지 않고 서든 데스로 이어진다.
  */
 function judge(game: Game): GameResult | null {
   const alive = game.players.filter((v) => !v.ghost);
-  if (getRemainingMs(game) <= 0) {
-    return { reason: "timeout", winnerIds: alive.map((v) => v.userId) };
-  }
   if (alive.length === 0 || (game.participantCount > 1 && alive.length === 1)) {
     const winners =
       alive.length || game.participantCount === 1

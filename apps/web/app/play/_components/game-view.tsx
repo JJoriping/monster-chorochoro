@@ -288,7 +288,10 @@ const GameTimer = () => {
       ]}
     >
       <Timer size={14} />
-      {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
+      {/* 시간이 다 되면 게임은 끝나지 않고 서든 데스로 이어진다 */}
+      {seconds > 0
+        ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
+        : l("suddenDeath")}
     </span>
   );
 };

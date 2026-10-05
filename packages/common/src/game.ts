@@ -50,8 +50,17 @@ export function getItemOfTile(tile: string): ItemType | null {
 /** 한 틱의 길이 (ms) */
 export const TICK_MS = 1000 / TICK_RATE;
 
-/** 게임의 제한 시간 (ms) */
-export const GAME_DURATION_MS = 180_000;
+/** 게임의 제한 시간 (ms). 시간이 다 되어도 게임은 끝나지 않고 서든 데스로 이어진다 */
+export const GAME_DURATION_MS = 120_000;
+
+/** 서든 데스에서 폭발이 일어날 칸에 경고 그림자를 먼저 보여 주는 시간 (ms) */
+export const SUDDEN_DEATH_WARNING_MS = 1500;
+
+/**
+ * 서든 데스에서 폭발을 새로 예고하는 간격 (ms).
+ * 처음에는 아무 칸 하나, 다음에는 두 칸, 그다음에는 세 칸… 하는 식으로 한 칸씩 늘어난다
+ */
+export const SUDDEN_DEATH_INTERVAL_MS = 3000;
 
 /** 게임을 시작하기 전에 카운트다운을 보여 주는 시간 (ms) */
 export const GAME_COUNTDOWN_MS = 1500;

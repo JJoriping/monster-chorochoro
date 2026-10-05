@@ -41,7 +41,6 @@ const ERRORS: Record<ErrorCode, string> = {
   tooManyPlayers: "이 맵에서 함께 플레이하기에는 인원이 너무 많습니다.",
 };
 const RESULT_REASONS: Record<GameResult["reason"], string> = {
-  timeout: "시간 종료",
   lastSurvivor: "최후의 생존자",
 };
 
@@ -104,6 +103,7 @@ export default I18n.register({
   gameBoard: "게임 화면",
   controls: "← ↑ → ↓ 이동 · Space 꾸루 놓기",
   timeLeft: "남은 시간",
+  suddenDeath: "서든 데스",
   ghost: "유령",
   leftGame: "나감",
   victory: "승리!",

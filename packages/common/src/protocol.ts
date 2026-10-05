@@ -113,6 +113,7 @@ export type ExplosionState = {
   arms: [number, number, number, number];
   /** `DIRECTIONS` 순서로 담은, 방향별로 폭풍의 끝 칸이 블록인지. 폭풍은 그 블록을 부수기만 하고 그 칸에 머무르지 않는다 */
   blocked: [boolean, boolean, boolean, boolean];
+  /** 터진 뒤로 지난 시간. 서든 데스의 폭발은 경고 그림자만 보이는 동안 음수다 */
   elapsedMs: number;
 };
 
@@ -142,7 +143,8 @@ export type GameSnapshot = {
 };
 
 export type GameResult = {
-  reason: "timeout" | "lastSurvivor";
+  /** 시간이 다 되어도 서든 데스로 이어지므로 마지막까지 살아남은 플레이어가 이긴다 */
+  reason: "lastSurvivor";
   /** 비어 있으면 승자가 없다 */
   winnerIds: UserId[];
 };

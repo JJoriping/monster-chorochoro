@@ -41,7 +41,6 @@ const ERRORS: Record<ErrorCode, string> = {
   tooManyPlayers: "There are too many players for this map.",
 };
 const RESULT_REASONS: Record<GameResult["reason"], string> = {
-  timeout: "Time's up",
   lastSurvivor: "Last one standing",
 };
 
@@ -104,6 +103,7 @@ export default I18n.register({
   gameBoard: "Game board",
   controls: "← ↑ → ↓ Move · Space Place kuru",
   timeLeft: "Time left",
+  suddenDeath: "Sudden death",
   ghost: "Ghost",
   leftGame: "Left",
   victory: "Victory!",

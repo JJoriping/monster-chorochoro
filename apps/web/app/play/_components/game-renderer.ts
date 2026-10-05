@@ -73,7 +73,7 @@ const FLOOR_COLORS: Record<MapTheme, [string, string]> = {
   village: [color("gray-5"), color("orange-5")],
   factory: [color("gray-4"), color("gray-5")],
   ice: [color("cyan-5"), color("cyan-4")],
-  volcano: [color("red-5"), color("brown-4")],
+  volcano: [color("brown-5"), color("gray-4")],
 };
 
 const INK = color("gray+4");
@@ -573,13 +573,16 @@ function drawKuruBody(
   }
 }
 
-/** 폭발과 함께 폭풍이 덮을 범위에 붉은 그림자를 깐다. 그림자는 그 칸에 폭풍이 닿으면 사라진다 */
+/**
+ * 폭발과 함께 폭풍이 덮을 범위에 붉은 그림자를 깐다. 그림자는 그 칸에 폭풍이 닿으면 사라진다.
+ * 서든 데스가 예고한 폭발은 터지기 전부터 그림자가 깜박인다
+ */
 function drawWarning(
   ctx: CanvasRenderingContext2D,
   explosion: ExplosionState,
   elapsedMs: number,
 ): void {
-  ctx.fillStyle = color("red", 0.25);
+  ctx.fillStyle = color("red", elapsedMs < 0 ? 0.25 + Math.sin(elapsedMs / 60) * 0.12 : 0.25);
   for (const { cell, distance } of getExplosionCells(explosion)) {
     if (elapsedMs >= distance * FLAME_SPREAD_MS) continue;
     ctx.beginPath();
